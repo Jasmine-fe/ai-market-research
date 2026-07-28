@@ -27,10 +27,12 @@ export async function generateMetadata(): Promise<Metadata> {
       default: "美股市場寬度儀表板",
       template: "%s · 美股市場寬度儀表板",
     },
-    description: "每日追蹤 S&P 500、MA20 乖離率與等權 Breadth 20。",
+    description:
+      "每日追蹤 S&P 500、QQQ、MA20 乖離率與等權 Breadth 20。",
     openGraph: {
       title: "美股市場寬度儀表板",
-      description: "同時觀察 SPX MA20 乖離率與等權 Breadth 20。",
+      description:
+        "同時觀察 SPX、QQQ 的 MA20 乖離率與各自等權 Breadth 20。",
       type: "website",
       url: origin,
       images: [
@@ -45,7 +47,8 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       title: "美股市場寬度儀表板",
-      description: "同時觀察 SPX MA20 乖離率與等權 Breadth 20。",
+      description:
+        "同時觀察 SPX、QQQ 的 MA20 乖離率與各自等權 Breadth 20。",
       images: [`${origin}/og.png`],
     },
   };

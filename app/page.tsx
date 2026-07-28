@@ -1,13 +1,6 @@
-import type { Metadata } from "next";
-
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "美股市場寬度儀表板",
-  description: "追蹤 S&P 500、MA20 乖離率與傳統等權 Breadth 20。",
-};
-
-type SpxSnapshot = {
+type MarketSnapshot = {
   close: number;
   sma20: number;
   changePercent: number;
@@ -24,7 +17,11 @@ type BreadthSnapshot = {
   low52w: number | null;
 };
 
-async function getSpxSnapshot(): Promise<SpxSnapshot | null> {
+type MarketState = ReturnType<typeof getMarketState>;
+
+async function getMarketSnapshot(
+  ticker: "SP:SPX" | "NASDAQ:QQQ",
+): Promise<MarketSnapshot | null> {
   try {
     const response = await fetch(
       "https://scanner.tradingview.com/america/scan",
@@ -32,7 +29,7 @@ async function getSpxSnapshot(): Promise<SpxSnapshot | null> {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          symbols: { tickers: ["SP:SPX"], query: { types: [] } },
+          symbols: { tickers: [ticker], query: { types: [] } },
           columns: [
             "close",
             "SMA20",
@@ -80,10 +77,12 @@ function firstNumber(source: string, patterns: RegExp[]) {
   return null;
 }
 
-async function getBreadthSnapshot(): Promise<BreadthSnapshot | null> {
+async function getBreadthSnapshot(
+  symbol: "S5TW" | "NDTW",
+): Promise<BreadthSnapshot | null> {
   try {
     const response = await fetch(
-      "https://www.barchart.com/stocks/quotes/%24S5TW",
+      `https://www.barchart.com/stocks/quotes/%24${symbol}`,
       {
         headers: {
           accept: "text/html,application/xhtml+xml",
@@ -98,7 +97,9 @@ async function getBreadthSnapshot(): Promise<BreadthSnapshot | null> {
     if (!response.ok) return null;
     const html = await response.text();
     const quote = html.match(
-      /"symbol":"\$S5TW","symbolName":"[^"]+","symbolType":9,"lastPrice":"([^"]+)","priceChange":"([^"]+)","percentChange":"[^"]+"[^}]*"tradeTime":"([^"]+)"/,
+      new RegExp(
+        `"symbol":"\\$${symbol}","symbolName":"[^"]+","symbolType":9,"lastPrice":"([^"]+)","priceChange":"([^"]+)","percentChange":"[^"]+"[^}]*"tradeTime":"([^"]+)"`,
+      ),
     );
     if (!quote) return null;
 
@@ -109,7 +110,7 @@ async function getBreadthSnapshot(): Promise<BreadthSnapshot | null> {
     return {
       value,
       changePoints,
-      tradeDate: quote[3],
+      tradeDate: quote[3].replaceAll("\\/", "/"),
       high52w: firstNumber(html, [
         /&quot;highPrice1y&quot;:([\d.]+)/,
         /"highPrice1y":([\d.]+)/,
@@ -152,7 +153,7 @@ function getMarketState(bias: number | null, breadth: number | null) {
     return {
       label: "廣泛上漲",
       tone: "positive",
-      summary: "指數位於 MA20 之上，多數成分股也參與上漲。",
+      summary: "價格位於 MA20 之上，多數成分股也參與上漲。",
       action: "結構偏健康；觀察 Breadth 是否繼續擴張。",
     };
   }
@@ -160,16 +161,16 @@ function getMarketState(bias: number | null, breadth: number | null) {
     return {
       label: "狹窄上漲",
       tone: "warning",
-      summary: "指數偏強，但參與上漲的股票有限，可能由權值股主導。",
-      action: "避免只看指數追價；留意寬度是否持續背離。",
+      summary: "價格偏強，但參與上漲的股票有限，可能由權值股主導。",
+      action: "避免只看價格追價；留意寬度是否持續背離。",
     };
   }
   if (bias < 0 && breadth >= 60) {
     return {
       label: "內部輪動",
       tone: "positive",
-      summary: "指數在 MA20 下方，但多數成分股仍站穩短期均線。",
-      action: "市場內部可能比指數健康；觀察權值股是否止跌。",
+      summary: "價格在 MA20 下方，但多數成分股仍站穩短期均線。",
+      action: "市場內部可能比價格健康；觀察權值股是否止跌。",
     };
   }
   if (bias < 0 && breadth < 40) {
@@ -178,8 +179,8 @@ function getMarketState(bias: number | null, breadth: number | null) {
       tone: breadth < 15 ? "extreme" : "negative",
       summary:
         breadth < 15
-          ? "指數與多數成分股同步偏弱，已進入短線極端區。"
-          : "指數與市場參與度同步下降，賣壓較為全面。",
+          ? "價格與多數成分股同步偏弱，已進入短線極端區。"
+          : "價格與市場參與度同步下降，賣壓較為全面。",
       action:
         breadth < 15
           ? "先視為布局準備區；等待 Breadth 反轉與情緒確認。"
@@ -189,7 +190,7 @@ function getMarketState(bias: number | null, breadth: number | null) {
   return {
     label: "多空混合",
     tone: "neutral",
-    summary: "指數位置與市場參與度尚未形成一致方向。",
+    summary: "價格位置與市場參與度尚未形成一致方向。",
     action: "等待其中一項明確擴張或惡化，不急著下結論。",
   };
 }
@@ -224,18 +225,201 @@ function MetricCard({
   );
 }
 
-export default async function Home() {
-  const [spx, breadth] = await Promise.all([
-    getSpxSnapshot(),
-    getBreadthSnapshot(),
-  ]);
-  const bias =
-    spx && spx.sma20 !== 0 ? (spx.close / spx.sma20 - 1) * 100 : null;
-  const state = getMarketState(bias, breadth?.value ?? null);
+function MarketSection({
+  id,
+  overline,
+  title,
+  description,
+  priceLabel,
+  breadthLabel,
+  market,
+  breadth,
+  bias,
+  state,
+  priceSourceUrl,
+  breadthSourceUrl,
+  priceChartSymbol,
+  breadthChartSymbol,
+}: {
+  id: string;
+  overline: string;
+  title: string;
+  description: string;
+  priceLabel: string;
+  breadthLabel: string;
+  market: MarketSnapshot | null;
+  breadth: BreadthSnapshot | null;
+  bias: number | null;
+  state: MarketState;
+  priceSourceUrl: string;
+  breadthSourceUrl: string;
+  priceChartSymbol: string;
+  breadthChartSymbol: string;
+}) {
   const breadthPosition =
     breadth?.high52w != null && breadth?.low52w != null
       ? `${formatNumber(breadth.low52w)}–${formatNumber(breadth.high52w)}`
       : "資料暫缺";
+
+  return (
+    <section className="market-section" aria-labelledby={`${id}-heading`}>
+      <div className="market-section__heading">
+        <div>
+          <p className="overline">{overline}</p>
+          <h2 id={`${id}-heading`}>{title}</h2>
+          <p>{description}</p>
+        </div>
+        <div className="market-section__date">
+          <span>BREADTH DATA</span>
+          <strong>{breadth?.tradeDate ?? "暫缺"}</strong>
+        </div>
+      </div>
+
+      <div className="metrics" aria-label={`${title}主要數據`}>
+        <MetricCard
+          eyebrow={priceLabel}
+          value={market ? formatNumber(market.close) : "—"}
+          detail={
+            market
+              ? `52週區間 ${formatNumber(market.low52w)}–${formatNumber(market.high52w)}`
+              : "TradingView 資料暫時無法取得"
+          }
+          change={
+            market ? signed(market.changePercent, "% today") : "資料暫缺"
+          }
+          tone={
+            market && market.changePercent > 0
+              ? "positive"
+              : market && market.changePercent < 0
+                ? "negative"
+                : "default"
+          }
+        />
+        <MetricCard
+          eyebrow={`${priceLabel} · MA20`}
+          value={market ? formatNumber(market.sma20) : "—"}
+          detail="過去20個交易日的平均價格"
+        />
+        <MetricCard
+          eyebrow="PRICE · MA20 BIAS"
+          value={bias != null ? signed(bias) : "—"}
+          unit="%"
+          detail={
+            bias == null
+              ? "無法計算"
+              : bias >= 0
+                ? "目前價格位於 MA20 之上"
+                : "目前價格位於 MA20 之下"
+          }
+          tone={
+            bias == null ? "default" : bias >= 0 ? "positive" : "negative"
+          }
+        />
+        <MetricCard
+          eyebrow={breadthLabel}
+          value={breadth ? formatNumber(breadth.value) : "—"}
+          unit="%"
+          detail={`52週區間 ${breadthPosition}`}
+          change={
+            breadth
+              ? signed(breadth.changePoints, " pt today")
+              : "資料暫缺"
+          }
+          tone={
+            breadth && breadth.value >= 60
+              ? "positive"
+              : breadth && breadth.value < 40
+                ? "negative"
+                : "default"
+          }
+        />
+      </div>
+
+      <div className="state-panel">
+        <div className="state-panel__label">
+          <span>CURRENT STATE</span>
+          <strong className={`state-pill state-pill--${state.tone}`}>
+            {state.label}
+          </strong>
+        </div>
+        <div>
+          <h2>{state.summary}</h2>
+          <p>{state.action}</p>
+        </div>
+        <div className="state-panel__coordinates">
+          <div>
+            <span>價格位置</span>
+            <strong>
+              {bias == null ? "—" : bias >= 0 ? "MA20上方" : "MA20下方"}
+            </strong>
+          </div>
+          <div>
+            <span>市場參與</span>
+            <strong>
+              {breadth
+                ? breadth.value >= 60
+                  ? "偏高"
+                  : breadth.value < 40
+                    ? "偏低"
+                    : "中性"
+                : "—"}
+            </strong>
+          </div>
+        </div>
+      </div>
+
+      <div className="chart-grid">
+        <article className="chart-card">
+          <div className="section-heading">
+            <div>
+              <p className="overline">PRICE LOCATION</p>
+              <h2>{priceLabel} 走勢</h2>
+            </div>
+            <a href={priceSourceUrl} target="_blank" rel="noreferrer">
+              TradingView ↗
+            </a>
+          </div>
+          <iframe
+            title={`${priceLabel}歷史圖`}
+            src={`https://s.tradingview.com/widgetembed/?symbol=${priceChartSymbol}&interval=D&theme=dark&style=1&timezone=America%2FNew_York&withdateranges=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&hideideas=1&locale=zh_TW`}
+            loading="lazy"
+          />
+        </article>
+
+        <article className="chart-card">
+          <div className="section-heading">
+            <div>
+              <p className="overline">MARKET PARTICIPATION</p>
+              <h2>{breadthLabel} 歷史走勢</h2>
+            </div>
+            <a href={breadthSourceUrl} target="_blank" rel="noreferrer">
+              {id === "spx" ? "S5TW" : "NDTW"} ↗
+            </a>
+          </div>
+          <iframe
+            title={`${title} Breadth 20 歷史圖`}
+            src={`https://s.tradingview.com/widgetembed/?symbol=${breadthChartSymbol}&interval=D&theme=dark&style=1&timezone=America%2FNew_York&withdateranges=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&hideideas=1&locale=zh_TW`}
+            loading="lazy"
+          />
+        </article>
+      </div>
+    </section>
+  );
+}
+
+export default async function Home() {
+  const [spx, spxBreadth, qqq, qqqBreadth] = await Promise.all([
+    getMarketSnapshot("SP:SPX"),
+    getBreadthSnapshot("S5TW"),
+    getMarketSnapshot("NASDAQ:QQQ"),
+    getBreadthSnapshot("NDTW"),
+  ]);
+  const spxBias =
+    spx && spx.sma20 !== 0 ? (spx.close / spx.sma20 - 1) * 100 : null;
+  const qqqBias =
+    qqq && qqq.sma20 !== 0 ? (qqq.close / qqq.sma20 - 1) * 100 : null;
+  const spxState = getMarketState(spxBias, spxBreadth?.value ?? null);
+  const qqqState = getMarketState(qqqBias, qqqBreadth?.value ?? null);
 
   return (
     <main>
@@ -257,154 +441,56 @@ export default async function Home() {
 
       <section className="hero" id="top">
         <div>
-          <p className="overline">S&amp;P 500 · DAILY MONITOR</p>
+          <p className="overline">SPX · QQQ · DAILY MONITOR</p>
           <h1>美股市場寬度儀表板</h1>
           <p className="hero__copy">
-            同時觀察指數離短期平均成本多遠，以及有多少成分股共同參與行情。
-            第一版先讓數據清楚、來源可核對，再逐步加入情緒與產業資訊。
+            分別觀察 S&amp;P 500 與 QQQ
+            離短期平均成本多遠，以及各自有多少成分股共同參與行情。
+            第一版先讓趨勢數據清楚、來源可核對。
           </p>
         </div>
         <div className="as-of">
-          <span>BREATH DATA AS OF</span>
-          <strong>{breadth?.tradeDate ?? "暫時無法取得"}</strong>
-          <small>美國市場收盤資料</small>
-        </div>
-      </section>
-
-      <section className="metrics" aria-label="市場主要數據">
-        <MetricCard
-          eyebrow="S&P 500 INDEX"
-          value={spx ? formatNumber(spx.close) : "—"}
-          detail={
-            spx
-              ? `52週區間 ${formatNumber(spx.low52w)}–${formatNumber(spx.high52w)}`
-              : "TradingView 資料暫時無法取得"
-          }
-          change={
-            spx ? signed(spx.changePercent, "% today") : "資料暫缺"
-          }
-          tone={
-            spx && spx.changePercent > 0
-              ? "positive"
-              : spx && spx.changePercent < 0
-                ? "negative"
-                : "default"
-          }
-        />
-        <MetricCard
-          eyebrow="S&P 500 · MA20"
-          value={spx ? formatNumber(spx.sma20) : "—"}
-          detail="過去20個交易日的指數平均價格"
-        />
-        <MetricCard
-          eyebrow="INDEX · MA20 BIAS"
-          value={bias != null ? signed(bias) : "—"}
-          unit="%"
-          detail={
-            bias == null
-              ? "無法計算"
-              : bias >= 0
-                ? "指數目前位於 MA20 之上"
-                : "指數目前位於 MA20 之下"
-          }
-          tone={
-            bias == null ? "default" : bias >= 0 ? "positive" : "negative"
-          }
-        />
-        <MetricCard
-          eyebrow="EQUAL-WEIGHT · BREADTH 20"
-          value={breadth ? formatNumber(breadth.value) : "—"}
-          unit="%"
-          detail={`52週區間 ${breadthPosition}`}
-          change={
-            breadth
-              ? signed(breadth.changePoints, " pt today")
-              : "資料暫缺"
-          }
-          tone={
-            breadth && breadth.value >= 60
-              ? "positive"
-              : breadth && breadth.value < 40
-                ? "negative"
-                : "default"
-          }
-        />
-      </section>
-
-      <section className="state-panel">
-        <div className="state-panel__label">
-          <span>CURRENT STATE</span>
-          <strong className={`state-pill state-pill--${state.tone}`}>
-            {state.label}
+          <span>LATEST BREADTH DATA</span>
+          <strong>
+            {spxBreadth?.tradeDate ?? qqqBreadth?.tradeDate ?? "暫時無法取得"}
           </strong>
-        </div>
-        <div>
-          <h2>{state.summary}</h2>
-          <p>{state.action}</p>
-        </div>
-        <div className="state-panel__coordinates">
-          <div>
-            <span>價格位置</span>
-            <strong>{bias == null ? "—" : bias >= 0 ? "MA20上方" : "MA20下方"}</strong>
-          </div>
-          <div>
-            <span>市場參與</span>
-            <strong>
-              {breadth
-                ? breadth.value >= 60
-                  ? "偏高"
-                  : breadth.value < 40
-                    ? "偏低"
-                    : "中性"
-                : "—"}
-            </strong>
-          </div>
+          <small>S&amp;P 500 · Nasdaq-100 收盤資料</small>
         </div>
       </section>
 
-      <section className="chart-grid">
-        <article className="chart-card">
-          <div className="section-heading">
-            <div>
-              <p className="overline">PRICE LOCATION</p>
-              <h2>S&amp;P 500 指數走勢</h2>
-            </div>
-            <a
-              href="https://www.tradingview.com/symbols/SPX/"
-              target="_blank"
-              rel="noreferrer"
-            >
-              TradingView ↗
-            </a>
-          </div>
-          <iframe
-            title="S&P 500 指數歷史圖"
-            src="https://s.tradingview.com/widgetembed/?symbol=SP%3ASPX&interval=D&theme=dark&style=1&timezone=America%2FNew_York&withdateranges=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&hideideas=1&locale=zh_TW"
-            loading="lazy"
-          />
-        </article>
+      <MarketSection
+        id="spx"
+        overline="BROAD US MARKET"
+        title="S&P 500"
+        description="用大盤價格位置與 500 檔成分股參與度，掌握整體美股短期趨勢。"
+        priceLabel="S&P 500 INDEX"
+        breadthLabel="S&P 500 · BREADTH 20"
+        market={spx}
+        breadth={spxBreadth}
+        bias={spxBias}
+        state={spxState}
+        priceSourceUrl="https://www.tradingview.com/symbols/SPX/"
+        breadthSourceUrl="https://www.tradingview.com/symbols/INDEX-S5TW/"
+        priceChartSymbol="SP%3ASPX"
+        breadthChartSymbol="INDEX%3AS5TW"
+      />
 
-        <article className="chart-card">
-          <div className="section-heading">
-            <div>
-              <p className="overline">MARKET PARTICIPATION</p>
-              <h2>Breadth 20 歷史走勢</h2>
-            </div>
-            <a
-              href="https://www.tradingview.com/symbols/INDEX-S5TW/"
-              target="_blank"
-              rel="noreferrer"
-            >
-              S5TW ↗
-            </a>
-          </div>
-          <iframe
-            title="S&P 500 Breadth 20 歷史圖"
-            src="https://s.tradingview.com/widgetembed/?symbol=INDEX%3AS5TW&interval=D&theme=dark&style=1&timezone=America%2FNew_York&withdateranges=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&hideideas=1&locale=zh_TW"
-            loading="lazy"
-          />
-        </article>
-      </section>
+      <MarketSection
+        id="qqq"
+        overline="NASDAQ-100 ETF"
+        title="QQQ / Nasdaq-100"
+        description="用 QQQ 價格位置與 Nasdaq-100 成分股參與度，掌握大型科技與成長股趨勢。"
+        priceLabel="QQQ ETF"
+        breadthLabel="NASDAQ-100 · BREADTH 20"
+        market={qqq}
+        breadth={qqqBreadth}
+        bias={qqqBias}
+        state={qqqState}
+        priceSourceUrl="https://www.tradingview.com/symbols/NASDAQ-QQQ/"
+        breadthSourceUrl="https://www.tradingview.com/symbols/INDEX-NDTW/"
+        priceChartSymbol="NASDAQ%3AQQQ"
+        breadthChartSymbol="INDEX%3ANDTW"
+      />
 
       <section className="reading-grid">
         <article className="method-card">
@@ -412,13 +498,16 @@ export default async function Home() {
           <h2>兩個數字，各自回答不同問題</h2>
           <div className="formula">
             <span>MA20乖離率</span>
-            <code>(SPX ÷ MA20 − 1) × 100</code>
-            <p>衡量加權指數離過去20日平均價格多遠。</p>
+            <code>(指數或ETF ÷ MA20 − 1) × 100</code>
+            <p>衡量 S&amp;P 500 或 QQQ 離過去20日平均價格多遠。</p>
           </div>
           <div className="formula">
             <span>傳統等權Breadth 20</span>
             <code>高於各自MA20的成分股數 ÷ 有效成分股數 × 100</code>
-            <p>衡量行情有多少股票共同參與，每檔股票只算一票。</p>
+            <p>
+              分別衡量 S&amp;P 500 與 Nasdaq-100
+              有多少股票共同參與，每檔股票只算一票。
+            </p>
           </div>
         </article>
 
@@ -426,7 +515,7 @@ export default async function Home() {
           <div className="section-heading">
             <div>
               <p className="overline">TWO-DIMENSION MATRIX</p>
-              <h2>同時使用的判讀方式</h2>
+              <h2>每個市場各自套用的判讀方式</h2>
             </div>
           </div>
           <div className="matrix">
@@ -461,7 +550,7 @@ export default async function Home() {
             <p className="overline">REFERENCE ZONES</p>
             <h2>Breadth 20 參考區間</h2>
           </div>
-          <p>極端值是觀察區，不是自動買賣訊號。</p>
+          <p>S&amp;P 500 與 Nasdaq-100 各自判讀；極端值不是自動買賣訊號。</p>
         </div>
         <div className="threshold-bar" aria-label="Breadth 20 參考區間">
           <span className="threshold-bar__extreme">0–15 極度低迷</span>
@@ -480,8 +569,8 @@ export default async function Home() {
         <div>
           <strong>資料來源</strong>
           <p>
-            S&amp;P 500 與 MA20：TradingView 延遲行情；Breadth 20：
-            Barchart S5TW／TradingView。資料可能延遲或中斷，請以來源頁面為準。
+            S&amp;P 500、QQQ 與 MA20：TradingView 延遲行情；Breadth
+            20：Barchart S5TW、NDTW／TradingView。資料可能延遲或中斷，請以來源頁面為準。
           </p>
         </div>
         <p>
