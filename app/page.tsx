@@ -1,3 +1,7 @@
+import CombinedTrendChart, {
+  type CombinedHistoryPoint,
+} from "./CombinedTrendChart";
+
 export const dynamic = "force-dynamic";
 
 type MarketSnapshot = {
@@ -18,6 +22,11 @@ type BreadthSnapshot = {
 };
 
 type MarketState = ReturnType<typeof getMarketState>;
+
+type HistoryPoint = {
+  date: string;
+  close: number;
+};
 
 async function getMarketSnapshot(
   ticker: "SP:SPX" | "NASDAQ:QQQ",
@@ -122,6 +131,105 @@ async function getBreadthSnapshot(
     };
   } catch {
     return null;
+  }
+}
+
+function parseHistory(source: string): HistoryPoint[] {
+  return source
+    .trim()
+    .split("\n")
+    .map((row) => {
+      const columns = row.split(",");
+      return {
+        date: columns[1] ?? "",
+        close: Number(columns[5]),
+      };
+    })
+    .filter(
+      (point) =>
+        /^\d{4}-\d{2}-\d{2}$/.test(point.date) &&
+        Number.isFinite(point.close),
+    );
+}
+
+async function getCombinedHistory(
+  priceSymbol: "$SPX" | "QQQ",
+  breadthSymbol: "$S5TW" | "$NDTW",
+): Promise<CombinedHistoryPoint[]> {
+  try {
+    const pageUrl = `https://www.barchart.com/stocks/quotes/${encodeURIComponent(breadthSymbol)}/interactive-chart`;
+    const pageResponse = await fetch(pageUrl, {
+      headers: {
+        accept: "text/html,application/xhtml+xml",
+        "accept-language": "en-US,en;q=0.8",
+        "user-agent":
+          "Mozilla/5.0 (compatible; MarketBreadthDashboard/1.0)",
+      },
+      cache: "no-store",
+    });
+    if (!pageResponse.ok) return [];
+
+    const setCookies = pageResponse.headers.getSetCookie();
+    const cookies = setCookies
+      .map((cookie) => cookie.split(";")[0])
+      .join("; ");
+    const encodedXsrf = setCookies
+      .find((cookie) => cookie.startsWith("XSRF-TOKEN="))
+      ?.split(";")[0]
+      .slice("XSRF-TOKEN=".length);
+    await pageResponse.text();
+    if (!cookies || !encodedXsrf) return [];
+
+    const getHistory = async (symbol: string) => {
+      const historyUrl = new URL(
+        "https://www.barchart.com/proxies/timeseries/queryeod.ashx",
+      );
+      historyUrl.search = new URLSearchParams({
+        symbol,
+        data: "daily",
+        maxrecords: "260",
+        volume: "contract",
+        order: "asc",
+        dividends: "false",
+        backadjust: "false",
+        daystoexpiration: "1",
+        contractroll: "expiration",
+      }).toString();
+      const response = await fetch(historyUrl, {
+        headers: {
+          "user-agent":
+            "Mozilla/5.0 (compatible; MarketBreadthDashboard/1.0)",
+          referer: pageUrl,
+          cookie: cookies,
+          "x-xsrf-token": decodeURIComponent(encodedXsrf),
+        },
+        cache: "no-store",
+      });
+      return response.ok ? parseHistory(await response.text()) : [];
+    };
+
+    const [prices, breadth] = await Promise.all([
+      getHistory(priceSymbol),
+      getHistory(breadthSymbol),
+    ]);
+    const breadthByDate = new Map(
+      breadth.map((point) => [point.date, point.close]),
+    );
+
+    return prices.flatMap((point) => {
+      const breadthValue = breadthByDate.get(point.date);
+      return breadthValue == null
+        ? []
+        : [
+            {
+              date: point.date,
+              price: point.close,
+              breadth: breadthValue,
+            },
+          ];
+    });
+  } catch {
+    return [];
   }
 }
 
@@ -238,8 +346,7 @@ function MarketSection({
   state,
   priceSourceUrl,
   breadthSourceUrl,
-  priceChartSymbol,
-  breadthChartSymbol,
+  history,
 }: {
   id: string;
   overline: string;
@@ -253,8 +360,7 @@ function MarketSection({
   state: MarketState;
   priceSourceUrl: string;
   breadthSourceUrl: string;
-  priceChartSymbol: string;
-  breadthChartSymbol: string;
+  history: CombinedHistoryPoint[];
 }) {
   const breadthPosition =
     breadth?.high52w != null && breadth?.low52w != null
@@ -368,52 +474,41 @@ function MarketSection({
         </div>
       </div>
 
-      <div className="chart-grid">
-        <article className="chart-card">
-          <div className="section-heading">
-            <div>
-              <p className="overline">PRICE LOCATION</p>
-              <h2>{priceLabel} 走勢</h2>
-            </div>
+      <article className="chart-card combined-chart-card">
+        <div className="section-heading">
+          <div>
+            <p className="overline">PRICE × MARKET PARTICIPATION</p>
+            <h2>{priceLabel} 與 {breadthLabel}</h2>
+          </div>
+          <div className="section-heading__links">
             <a href={priceSourceUrl} target="_blank" rel="noreferrer">
-              TradingView ↗
+              價格來源 ↗
             </a>
-          </div>
-          <iframe
-            title={`${priceLabel}歷史圖`}
-            src={`https://s.tradingview.com/widgetembed/?symbol=${priceChartSymbol}&interval=D&theme=dark&style=1&timezone=America%2FNew_York&withdateranges=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&hideideas=1&locale=zh_TW`}
-            loading="lazy"
-          />
-        </article>
-
-        <article className="chart-card">
-          <div className="section-heading">
-            <div>
-              <p className="overline">MARKET PARTICIPATION</p>
-              <h2>{breadthLabel} 歷史走勢</h2>
-            </div>
             <a href={breadthSourceUrl} target="_blank" rel="noreferrer">
-              {id === "spx" ? "S5TW" : "NDTW"} ↗
+              Breadth來源 ↗
             </a>
           </div>
-          <iframe
-            title={`${title} Breadth 20 歷史圖`}
-            src={`https://s.tradingview.com/widgetembed/?symbol=${breadthChartSymbol}&interval=D&theme=dark&style=1&timezone=America%2FNew_York&withdateranges=1&hide_side_toolbar=1&allow_symbol_change=0&save_image=0&hideideas=1&locale=zh_TW`}
-            loading="lazy"
-          />
-        </article>
-      </div>
+        </div>
+        <CombinedTrendChart
+          data={history}
+          priceLabel={priceLabel}
+          breadthLabel={breadthLabel}
+        />
+      </article>
     </section>
   );
 }
 
 export default async function Home() {
-  const [spx, spxBreadth, qqq, qqqBreadth] = await Promise.all([
-    getMarketSnapshot("SP:SPX"),
-    getBreadthSnapshot("S5TW"),
-    getMarketSnapshot("NASDAQ:QQQ"),
-    getBreadthSnapshot("NDTW"),
-  ]);
+  const [spx, spxBreadth, qqq, qqqBreadth, spxHistory, qqqHistory] =
+    await Promise.all([
+      getMarketSnapshot("SP:SPX"),
+      getBreadthSnapshot("S5TW"),
+      getMarketSnapshot("NASDAQ:QQQ"),
+      getBreadthSnapshot("NDTW"),
+      getCombinedHistory("$SPX", "$S5TW"),
+      getCombinedHistory("QQQ", "$NDTW"),
+    ]);
   const spxBias =
     spx && spx.sma20 !== 0 ? (spx.close / spx.sma20 - 1) * 100 : null;
   const qqqBias =
@@ -471,8 +566,7 @@ export default async function Home() {
         state={spxState}
         priceSourceUrl="https://www.tradingview.com/symbols/SPX/"
         breadthSourceUrl="https://www.tradingview.com/symbols/INDEX-S5TW/"
-        priceChartSymbol="SP%3ASPX"
-        breadthChartSymbol="INDEX%3AS5TW"
+        history={spxHistory}
       />
 
       <MarketSection
@@ -488,8 +582,7 @@ export default async function Home() {
         state={qqqState}
         priceSourceUrl="https://www.tradingview.com/symbols/NASDAQ-QQQ/"
         breadthSourceUrl="https://www.tradingview.com/symbols/INDEX-NDTW/"
-        priceChartSymbol="NASDAQ%3AQQQ"
-        breadthChartSymbol="INDEX%3ANDTW"
+        history={qqqHistory}
       />
 
       <section className="reading-grid">
@@ -569,8 +662,8 @@ export default async function Home() {
         <div>
           <strong>資料來源</strong>
           <p>
-            S&amp;P 500、QQQ 與 MA20：TradingView 延遲行情；Breadth
-            20：Barchart S5TW、NDTW／TradingView。資料可能延遲或中斷，請以來源頁面為準。
+            即時卡片：TradingView 延遲行情與 Barchart S5TW、NDTW；歷史雙層圖：
+            Barchart 日線資料。資料可能延遲或中斷，請以來源頁面為準。
           </p>
         </div>
         <p>
