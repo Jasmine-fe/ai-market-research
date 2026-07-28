@@ -61,15 +61,20 @@ export default function CombinedTrendChart({
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const [width, setWidth] = useState(900);
 
-  const allMovingAverages = useMemo(() => movingAverage(data), [data]);
+  const allMa20 = useMemo(() => movingAverage(data, 20), [data]);
+  const allMa60 = useMemo(() => movingAverage(data, 60), [data]);
   const startIndex = Math.max(0, data.length - RANGE_LENGTH[range]);
   const visibleData = useMemo(
     () => data.slice(startIndex),
     [data, startIndex],
   );
   const visibleMa20 = useMemo(
-    () => allMovingAverages.slice(startIndex),
-    [allMovingAverages, startIndex],
+    () => allMa20.slice(startIndex),
+    [allMa20, startIndex],
+  );
+  const visibleMa60 = useMemo(
+    () => allMa60.slice(startIndex),
+    [allMa60, startIndex],
   );
 
   useEffect(() => {
@@ -103,6 +108,7 @@ export default function CombinedTrendChart({
       grid: "rgba(226, 240, 232, 0.10)",
       green: "#7ee2a8",
       blue: "#83b8ff",
+      violet: "#d0a8ff",
       amber: "#f1c876",
       red: "#ff817c",
       background: "#101714",
@@ -121,11 +127,22 @@ export default function CombinedTrendChart({
     context.fillRect(0, 0, width, cssHeight);
 
     const priceValues = visibleData.map((point) => point.price);
-    const maValues = visibleMa20.filter(
+    const ma20Values = visibleMa20.filter(
       (value): value is number => value != null,
     );
-    const rawMin = Math.min(...priceValues, ...maValues);
-    const rawMax = Math.max(...priceValues, ...maValues);
+    const ma60Values = visibleMa60.filter(
+      (value): value is number => value != null,
+    );
+    const rawMin = Math.min(
+      ...priceValues,
+      ...ma20Values,
+      ...ma60Values,
+    );
+    const rawMax = Math.max(
+      ...priceValues,
+      ...ma20Values,
+      ...ma60Values,
+    );
     const pricePadding = Math.max((rawMax - rawMin) * 0.1, rawMax * 0.004);
     const priceMin = rawMin - pricePadding;
     const priceMax = rawMax + pricePadding;
@@ -213,6 +230,7 @@ export default function CombinedTrendChart({
       context.stroke();
     };
 
+    drawLine(visibleMa60, priceY, colors.violet, 1.4);
     drawLine(visibleMa20, priceY, colors.blue, 1.4);
     drawLine(
       visibleData.map((point) => point.price),
@@ -280,6 +298,7 @@ export default function CombinedTrendChart({
     priceLabel,
     visibleData,
     visibleMa20,
+    visibleMa60,
     width,
   ]);
 
@@ -307,6 +326,10 @@ export default function CombinedTrendChart({
 
   const hovered =
     hoverIndex != null ? visibleData[hoverIndex] ?? null : null;
+  const hoveredMa20 =
+    hoverIndex != null ? visibleMa20[hoverIndex] ?? null : null;
+  const hoveredMa60 =
+    hoverIndex != null ? visibleMa60[hoverIndex] ?? null : null;
   const latest = visibleData.at(-1);
 
   if (data.length < 2) {
@@ -322,7 +345,8 @@ export default function CombinedTrendChart({
       <div className="combined-chart__toolbar">
         <div className="combined-chart__legend" aria-label="圖例">
           <span className="legend-price">{priceLabel}</span>
-          <span className="legend-ma">MA20</span>
+          <span className="legend-ma20">MA20</span>
+          <span className="legend-ma60">MA60</span>
           <span className="legend-breadth">{breadthLabel}</span>
         </div>
         <div className="range-controls" aria-label="圖表顯示範圍">
@@ -347,7 +371,7 @@ export default function CombinedTrendChart({
           ref={canvasRef}
           role="img"
           tabIndex={0}
-          aria-label={`${priceLabel}價格與${breadthLabel}歷史走勢，共用日期座標。使用左右方向鍵查看每日數值。`}
+          aria-label={`${priceLabel}價格、MA20、MA60與${breadthLabel}歷史走勢，共用日期座標。使用左右方向鍵查看每日數值。`}
           onPointerMove={setPointerPosition}
           onPointerDown={setPointerPosition}
           onPointerLeave={() => setHoverIndex(null)}
@@ -369,6 +393,12 @@ export default function CombinedTrendChart({
           >
             <strong>{displayDate(hovered.date)}</strong>
             <span>{priceLabel} {compactPrice(hovered.price)}</span>
+            <span>
+              MA20 {hoveredMa20 == null ? "—" : compactPrice(hoveredMa20)}
+            </span>
+            <span>
+              MA60 {hoveredMa60 == null ? "—" : compactPrice(hoveredMa60)}
+            </span>
             <span>{breadthLabel} {formatNumber(hovered.breadth)}%</span>
           </div>
         )}

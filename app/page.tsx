@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 type MarketSnapshot = {
   close: number;
   sma20: number;
+  sma60: number;
   changePercent: number;
   high52w: number;
   low52w: number;
@@ -42,6 +43,7 @@ async function getMarketSnapshot(
           columns: [
             "close",
             "SMA20",
+            "SMA60",
             "change",
             "price_52_week_high",
             "price_52_week_low",
@@ -58,17 +60,23 @@ async function getMarketSnapshot(
       data?: Array<{ d?: Array<number | string> }>;
     };
     const row = payload.data?.[0]?.d;
-    if (!row || typeof row[0] !== "number" || typeof row[1] !== "number") {
+    if (
+      !row ||
+      typeof row[0] !== "number" ||
+      typeof row[1] !== "number" ||
+      typeof row[2] !== "number"
+    ) {
       return null;
     }
 
     return {
       close: row[0],
       sma20: row[1],
-      changePercent: typeof row[2] === "number" ? row[2] : 0,
-      high52w: typeof row[3] === "number" ? row[3] : row[0],
-      low52w: typeof row[4] === "number" ? row[4] : row[0],
-      delayed: String(row[5] ?? "").includes("delayed"),
+      sma60: row[2],
+      changePercent: typeof row[3] === "number" ? row[3] : 0,
+      high52w: typeof row[4] === "number" ? row[4] : row[0],
+      low52w: typeof row[5] === "number" ? row[5] : row[0],
+      delayed: String(row[6] ?? "").includes("delayed"),
     };
   } catch {
     return null;
@@ -342,7 +350,8 @@ function MarketSection({
   breadthLabel,
   market,
   breadth,
-  bias,
+  bias20,
+  bias60,
   state,
   priceSourceUrl,
   breadthSourceUrl,
@@ -356,7 +365,8 @@ function MarketSection({
   breadthLabel: string;
   market: MarketSnapshot | null;
   breadth: BreadthSnapshot | null;
-  bias: number | null;
+  bias20: number | null;
+  bias60: number | null;
   state: MarketState;
   priceSourceUrl: string;
   breadthSourceUrl: string;
@@ -408,17 +418,45 @@ function MarketSection({
         />
         <MetricCard
           eyebrow="PRICE · MA20 BIAS"
-          value={bias != null ? signed(bias) : "—"}
+          value={bias20 != null ? signed(bias20) : "—"}
           unit="%"
           detail={
-            bias == null
+            bias20 == null
               ? "無法計算"
-              : bias >= 0
+              : bias20 >= 0
                 ? "目前價格位於 MA20 之上"
                 : "目前價格位於 MA20 之下"
           }
           tone={
-            bias == null ? "default" : bias >= 0 ? "positive" : "negative"
+            bias20 == null
+              ? "default"
+              : bias20 >= 0
+                ? "positive"
+                : "negative"
+          }
+        />
+        <MetricCard
+          eyebrow={`${priceLabel} · MA60`}
+          value={market ? formatNumber(market.sma60) : "—"}
+          detail="過去60個交易日的平均價格"
+        />
+        <MetricCard
+          eyebrow="PRICE · MA60 BIAS"
+          value={bias60 != null ? signed(bias60) : "—"}
+          unit="%"
+          detail={
+            bias60 == null
+              ? "無法計算"
+              : bias60 >= 0
+                ? "目前價格位於 MA60 之上"
+                : "目前價格位於 MA60 之下"
+          }
+          tone={
+            bias60 == null
+              ? "default"
+              : bias60 >= 0
+                ? "positive"
+                : "negative"
           }
         />
         <MetricCard
@@ -454,9 +492,23 @@ function MarketSection({
         </div>
         <div className="state-panel__coordinates">
           <div>
-            <span>價格位置</span>
+            <span>短期價格</span>
             <strong>
-              {bias == null ? "—" : bias >= 0 ? "MA20上方" : "MA20下方"}
+              {bias20 == null
+                ? "—"
+                : bias20 >= 0
+                  ? "MA20上方"
+                  : "MA20下方"}
+            </strong>
+          </div>
+          <div>
+            <span>中期價格</span>
+            <strong>
+              {bias60 == null
+                ? "—"
+                : bias60 >= 0
+                  ? "MA60上方"
+                  : "MA60下方"}
             </strong>
           </div>
           <div>
@@ -511,8 +563,12 @@ export default async function Home() {
     ]);
   const spxBias =
     spx && spx.sma20 !== 0 ? (spx.close / spx.sma20 - 1) * 100 : null;
+  const spxBias60 =
+    spx && spx.sma60 !== 0 ? (spx.close / spx.sma60 - 1) * 100 : null;
   const qqqBias =
     qqq && qqq.sma20 !== 0 ? (qqq.close / qqq.sma20 - 1) * 100 : null;
+  const qqqBias60 =
+    qqq && qqq.sma60 !== 0 ? (qqq.close / qqq.sma60 - 1) * 100 : null;
   const spxState = getMarketState(spxBias, spxBreadth?.value ?? null);
   const qqqState = getMarketState(qqqBias, qqqBreadth?.value ?? null);
 
@@ -540,7 +596,7 @@ export default async function Home() {
           <h1>美股市場寬度儀表板</h1>
           <p className="hero__copy">
             分別觀察 S&amp;P 500 與 QQQ
-            離短期平均成本多遠，以及各自有多少成分股共同參與行情。
+            離短、中期平均成本多遠，以及各自有多少成分股共同參與行情。
             第一版先讓趨勢數據清楚、來源可核對。
           </p>
         </div>
@@ -562,7 +618,8 @@ export default async function Home() {
         breadthLabel="S&P 500 · BREADTH 20"
         market={spx}
         breadth={spxBreadth}
-        bias={spxBias}
+        bias20={spxBias}
+        bias60={spxBias60}
         state={spxState}
         priceSourceUrl="https://www.tradingview.com/symbols/SPX/"
         breadthSourceUrl="https://www.tradingview.com/symbols/INDEX-S5TW/"
@@ -578,7 +635,8 @@ export default async function Home() {
         breadthLabel="NASDAQ-100 · BREADTH 20"
         market={qqq}
         breadth={qqqBreadth}
-        bias={qqqBias}
+        bias20={qqqBias}
+        bias60={qqqBias60}
         state={qqqState}
         priceSourceUrl="https://www.tradingview.com/symbols/NASDAQ-QQQ/"
         breadthSourceUrl="https://www.tradingview.com/symbols/INDEX-NDTW/"
@@ -588,11 +646,13 @@ export default async function Home() {
       <section className="reading-grid">
         <article className="method-card">
           <p className="overline">HOW IT IS CALCULATED</p>
-          <h2>兩個數字，各自回答不同問題</h2>
+          <h2>價格週期與市場參與，各自回答不同問題</h2>
           <div className="formula">
-            <span>MA20乖離率</span>
-            <code>(指數或ETF ÷ MA20 − 1) × 100</code>
-            <p>衡量 S&amp;P 500 或 QQQ 離過去20日平均價格多遠。</p>
+            <span>MA20／MA60乖離率</span>
+            <code>(指數或ETF ÷ MA20或MA60 − 1) × 100</code>
+            <p>
+              MA20 衡量短期價格位置；MA60 衡量約一季交易日的中期價格位置。
+            </p>
           </div>
           <div className="formula">
             <span>傳統等權Breadth 20</span>
@@ -607,32 +667,32 @@ export default async function Home() {
         <article className="matrix-card">
           <div className="section-heading">
             <div>
-              <p className="overline">TWO-DIMENSION MATRIX</p>
-              <h2>每個市場各自套用的判讀方式</h2>
+              <p className="overline">SHORT-TERM MATRIX</p>
+              <h2>MA20 與 Breadth 20 的短期判讀方式</h2>
             </div>
           </div>
           <div className="matrix">
             <div className="matrix__axis matrix__axis--y">Breadth 高</div>
             <div className="matrix__cell matrix__cell--good">
               <strong>內部輪動</strong>
-              <span>Bias負 · Breadth高</span>
+              <span>Bias20負 · Breadth高</span>
             </div>
             <div className="matrix__cell matrix__cell--best">
               <strong>廣泛上漲</strong>
-              <span>Bias正 · Breadth高</span>
+              <span>Bias20正 · Breadth高</span>
             </div>
             <div className="matrix__axis matrix__axis--y">Breadth 低</div>
             <div className="matrix__cell matrix__cell--bad">
               <strong>廣泛走弱</strong>
-              <span>Bias負 · Breadth低</span>
+              <span>Bias20負 · Breadth低</span>
             </div>
             <div className="matrix__cell matrix__cell--warn">
               <strong>狹窄上漲</strong>
-              <span>Bias正 · Breadth低</span>
+              <span>Bias20正 · Breadth低</span>
             </div>
             <div />
-            <div className="matrix__axis">Bias 負</div>
-            <div className="matrix__axis">Bias 正</div>
+            <div className="matrix__axis">Bias20 負</div>
+            <div className="matrix__axis">Bias20 正</div>
           </div>
         </article>
       </section>
