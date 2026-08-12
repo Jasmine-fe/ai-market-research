@@ -69,6 +69,17 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof ResearchRefusal) {
       const details = (error.internalDetails ?? {}) as Record<string, unknown>;
+      const evaluationChecks = Array.isArray(details.checks)
+        ? (details.checks as Array<{ name?: unknown; passed?: unknown }>).flatMap((check) =>
+            typeof check.name === "string" && typeof check.passed === "boolean"
+              ? [{ name: check.name, passed: check.passed }]
+              : [],
+          )
+        : undefined;
+      console.warn("Market research refused", error.code, {
+        requestId,
+        evaluationChecks,
+      });
       await persistExecution({
         requestId,
         requestedAt,
@@ -77,6 +88,7 @@ export async function POST(request: Request) {
         question,
         errorCode: error.code,
         queryRewrite: details.rewrite as ExecutionLogSummary["queryRewrite"],
+        evaluationChecks,
       });
       const status = error.code === "RAG_INDEX_EMPTY" ? 503 : 422;
       return Response.json(

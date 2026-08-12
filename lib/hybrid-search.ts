@@ -46,11 +46,19 @@ function round(value: number) {
 }
 
 function keywordMatchQuery(keywords: string[]) {
-  return keywords
-    .map((keyword) => keyword.replace(/["']/g, " ").replace(/\s+/g, " ").trim())
-    .filter((keyword) => keyword.length >= 2)
-    .map((keyword) => `"${keyword}"`)
-    .join(" OR ");
+  const stopWords = new Set(["and", "for", "from", "into", "of", "the", "to", "with"]);
+  const terms = keywords.flatMap((keyword) => {
+    const words = keyword
+      .toLowerCase()
+      .replace(/[^a-z0-9-]+/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter((word) => word.length >= 3 && !stopWords.has(word));
+    const phrase = words.length > 1 ? words.join(" ") : "";
+    return [...(phrase ? [phrase] : []), ...words];
+  });
+
+  return [...new Set(terms)].map((term) => `"${term}"`).join(" OR ");
 }
 
 export async function rewriteResearchQuery(question: string): Promise<QueryRewrite> {
