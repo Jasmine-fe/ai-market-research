@@ -119,20 +119,20 @@ test("evaluation fails closed when a cited source does not support a claim", () 
   assert.equal(checks.find((item) => item.name === "引用支持主張")?.passed, false);
 });
 
-test("evaluation accepts dates and a safely rounded index level", () => {
+test("evaluation accepts dates and safely rounded source values", () => {
   const brief: MarketBriefContent = {
     headline: "市場研究",
-    summary: ["SPX 約為 7730。", "歷史案例日期為 2021-06-08。"],
+    summary: ["SPX 約為 7730，Breadth 約為 63%。", "QQQ Breadth 約為 65%。"],
     observations: [
       {
         label: "市場",
-        detail: "SPX 約為 7730。",
+        detail: "SPX 約為 7730，Breadth 約為 63%。",
         evidenceIds: ["market:spx-current"],
       },
       {
         label: "案例",
-        detail: "案例日期為 2021-06-08。",
-        evidenceIds: ["analog:2021-06-08"],
+        detail: "QQQ Breadth 約為 65%，案例日期為 2021-06-08。",
+        evidenceIds: ["market:qqq-current", "analog:2021-06-08"],
       },
     ],
     watchFor: ["Breadth 是否擴張"],
@@ -151,7 +151,10 @@ test("evaluation accepts dates and a safely rounded index level", () => {
     brief,
     [analog],
     [],
-    { spx: { date: "2026-08-11", price: 7728.2 }, qqq: {} },
+    {
+      spx: { date: "2026-08-11", price: 7728.2, breadth: 63.61 },
+      qqq: { breadth: 64.7 },
+    },
     [true, true],
   );
   assert.equal(checks.find((item) => item.name === "數字有根據")?.passed, true);

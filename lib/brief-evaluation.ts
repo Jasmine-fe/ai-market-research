@@ -37,6 +37,11 @@ const NUMBER_PATTERN = /(?<!\d)[-+]?\d+(?:\.\d+)?/g;
 
 function isGroundedNumber(mentioned: number, allowed: number[]) {
   return allowed.some((value) => {
+    const isSourceValueRoundedToInteger =
+      Number.isInteger(mentioned) &&
+      (mentioned === Math.round(value) || mentioned === Math.trunc(value));
+    if (isSourceValueRoundedToInteger) return true;
+
     const absoluteTolerance = 0.11;
     const roundedIndexTolerance =
       Number.isInteger(mentioned) && Math.abs(value) >= 100
