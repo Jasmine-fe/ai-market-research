@@ -262,7 +262,7 @@ function getMarketState(bias: number | null, breadth: number | null) {
           : "價格與市場參與度同步下降，賣壓較為全面。",
       action:
         breadth < 15
-          ? "先視為布局準備區；等待 Breadth 反轉與情緒確認。"
+      ? "先視為佈局準備區；等待 Breadth 反轉與情緒確認。"
           : "暫不把下跌當成底部；持續觀察 Breadth 變化。",
     };
   }
@@ -577,7 +577,7 @@ export default async function Home() {
           <p className="overline">START HERE · 指標快速入門</p>
           <h2 id="metric-guide-heading">指標定義</h2>
           <p>
-            三個指標有先後關係：先用均線建立比較基準，再看多少股票站上均線，最後觀察價格離均線多遠。建議依序閱讀。
+            先用均線建立比較基準，再看多少股票站上均線，最後觀察價格離均線多遠
           </p>
         </div>
         <div className="metric-guide__grid">

@@ -165,10 +165,13 @@ export default function MarketBrief() {
           <section className="analog-section">
             <div className="section-heading section-heading--compact">
               <div>
-                <p className="overline">HISTORICAL ANALOGS</p>
-                <h3>三個量化相似案例</h3>
+                <p className="overline">HISTORICAL CASES</p>
+                <h3>三個歷史相似案例</h3>
+                <p className="analog-section__description">
+                  依目前的市場廣度與均線位置，找出狀態最接近的過往日期。
+                </p>
               </div>
-              <span>後續 20 個交易日</span>
+              <span>其後 20 個交易日表現</span>
             </div>
             <div className="analog-grid">
               {result.analogs.map((analog) => (

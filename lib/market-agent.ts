@@ -7,6 +7,7 @@ import {
 } from "./market-intelligence";
 import { generateStructuredResponse } from "./openai";
 import { isMarketDateFresh } from "./research-guardrails";
+import { normalizeMarketBriefLanguage } from "./traditional-chinese";
 
 export class MarketBriefRefusal extends Error {
   readonly code: string;
@@ -151,7 +152,10 @@ export async function runMarketBriefAgent() {
       spx: { id: "market:spx-current", ...featuresForPrompt(current.spx) },
       qqq: { id: "market:qqq-current", ...featuresForPrompt(current.qqq) },
     },
-    analogs: analogs.map((analog) => ({ id: `analog:${analog.date}`, ...analog })),
+    historicalSimilarCases: analogs.map((analog) => ({
+      id: `analog:${analog.date}`,
+      ...analog,
+    })),
     retrievedEvidence: evidence.map((item) => ({
       id: item.id,
       meetingDate: item.meetingDate,
@@ -171,7 +175,9 @@ export async function runMarketBriefAgent() {
       "不得提供買進、賣出、加碼、減碼、部位比例或報酬保證。",
       "只能使用輸入中已出現的數字；需要數字時必須原樣引用，不得估算或創造新數值。",
       "每一項 observation 必須引用至少一個輸入中存在的 evidence id。",
-      "使用繁體中文，文字簡潔，明確說明歷史相似不代表未來相同。",
+      "一律使用臺灣繁體中文，不得出現簡體字。",
+      "不要使用「類比」一詞；請統一稱為「歷史相似案例」。",
+      "文字簡潔，明確說明歷史相似不代表未來相同。",
     ].join("\n"),
     `請根據以下工具與檢索結果產生今日 Market Brief：\n${JSON.stringify(promptPayload)}`,
     MARKET_BRIEF_SCHEMA,
@@ -179,7 +185,7 @@ export async function runMarketBriefAgent() {
   );
   trace.push({ step: "llm", label: "以結構化輸出生成研究摘要", status: "completed" });
 
-  const brief = response.data as MarketBriefContent;
+  const brief = normalizeMarketBriefLanguage(response.data as MarketBriefContent);
   const claimSupport = await evaluateClaimSupportWithModel(brief, promptPayload);
   const checks = evaluateBrief(
     brief,

@@ -1193,6 +1193,14 @@ footer p {
   font-weight: 540;
 }
 
+.analog-section__description {
+  max-width: 620px;
+  margin: 8px 0 0;
+  color: #a9b8b1;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .section-heading--compact > span {
   color: var(--muted);
   font: 9px var(--font-geist-mono), monospace;

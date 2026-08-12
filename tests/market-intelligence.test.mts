@@ -11,6 +11,7 @@ import {
   selectRelevantEvidence,
 } from "../lib/research-guardrails.ts";
 import { parseBreadthSnapshot } from "../lib/barchart-breadth.ts";
+import { normalizeMarketBriefLanguage } from "../lib/traditional-chinese.ts";
 
 function history(scale: number): CombinedHistoryPoint[] {
   const start = Date.UTC(2024, 0, 1);
@@ -35,6 +36,23 @@ test("analog tool returns three past cases with forward outcomes", () => {
   assert.equal(result.analogs.length, 3);
   assert.ok(result.analogs.every((item) => item.date < result.current.spx.date));
   assert.ok(result.analogs.every((item) => Number.isFinite(item.spxReturn20)));
+});
+
+test("AI copy is normalized to Taiwan Traditional Chinese without analog jargon", () => {
+  const brief = normalizeMarketBriefLanguage({
+    headline: "类比显示市场广度偏弱",
+    summary: ["这与历史类比接近。"],
+    observations: [
+      { label: "观察", detail: "价格仍在均线下方。", evidenceIds: [] },
+    ],
+    watchFor: ["后续变化"],
+    limitations: ["历史不代表未来"],
+  });
+
+  assert.equal(brief.headline, "相似案例顯示市場廣度偏弱");
+  assert.equal(brief.summary[0], "這與歷史相似案例接近。");
+  assert.equal(brief.observations[0].label, "觀察");
+  assert.equal(brief.watchFor[0], "後續變化");
 });
 
 test("evaluation rejects invented citations and trading instructions", () => {
