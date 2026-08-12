@@ -572,6 +572,45 @@ export default async function Home() {
         </div>
       </section>
 
+      <section className="metric-guide" aria-labelledby="metric-guide-heading">
+        <div className="metric-guide__heading">
+          <p className="overline">START HERE · 指標快速入門</p>
+          <h2 id="metric-guide-heading">先看懂三個數字，再開始判讀市場</h2>
+          <p>
+            價格告訴你指數漲跌；廣度則告訴你，這段行情有多少股票一起參與。
+          </p>
+        </div>
+        <div className="metric-guide__grid">
+          <article>
+            <span className="metric-guide__number">01</span>
+            <div>
+              <h3>廣度 Breadth 20</h3>
+              <p>
+                成分股中，股價高於各自 MA20 的比例。數值越高，代表上漲參與越廣；越低，代表多數股票偏弱。
+              </p>
+            </div>
+          </article>
+          <article>
+            <span className="metric-guide__number">02</span>
+            <div>
+              <h3>MA20／MA60</h3>
+              <p>
+                過去 20、60 個交易日的平均價格，用來觀察短期與中期趨勢位置，不是預測未來的目標價。
+              </p>
+            </div>
+          </article>
+          <article>
+            <span className="metric-guide__number">03</span>
+            <div>
+              <h3>乖離率 Bias</h3>
+              <p>
+                目前價格離均線多遠。正值代表在均線上方，負值代表在下方；要搭配廣度一起看市場是否健康。
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <MarketBrief />
 
       <MarketSection

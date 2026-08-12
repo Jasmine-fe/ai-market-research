@@ -76,21 +76,34 @@ export default function MarketBrief() {
   return (
     <section className="ai-brief" aria-labelledby="ai-brief-heading">
       <div className="ai-brief__intro">
-        <div>
-          <p className="overline">AI MARKET RESEARCH</p>
+        <div className="ai-brief__intro-copy">
+          <div className="ai-brief__label">
+            <span>AI</span>
+            <p>AI MARKET RESEARCH</p>
+          </div>
           <h2 id="ai-brief-heading">現在像哪一段市場？</h2>
           <p>
-            AI 會讀取目前 Breadth、搜尋三個歷史相似案例、計算後續表現，並從聯準會官方文件補上可引用的背景。
+            把今天的市場寬度與價格位置交給 AI，比對三個歷史相似案例，計算當時後續表現，再用聯準會官方文件補充可追溯的背景。
           </p>
+          <ol className="ai-brief__steps" aria-label="AI 研究流程">
+            <li><span>1</span>讀取目前市場</li>
+            <li><span>2</span>尋找歷史案例</li>
+            <li><span>3</span>檢索官方文件</li>
+            <li><span>4</span>檢查答案品質</li>
+          </ol>
         </div>
-        <button
-          className="ai-brief__button"
-          type="button"
-          onClick={analyzeMarket}
-          disabled={status === "loading"}
-        >
-          {status === "loading" ? "正在研究市場…" : result ? "重新分析" : "分析目前市場"}
-        </button>
+        <div className="ai-brief__action">
+          <p>約需 20–30 秒</p>
+          <button
+            className="ai-brief__button"
+            type="button"
+            onClick={analyzeMarket}
+            disabled={status === "loading"}
+          >
+            {status === "loading" ? "正在研究市場…" : result ? "重新分析" : "分析目前市場"}
+          </button>
+          <small>研究用途 · 不提供買賣指令</small>
+        </div>
       </div>
 
       {status === "loading" && (
