@@ -122,7 +122,10 @@ test("evaluation fails closed when a cited source does not support a claim", () 
 test("evaluation accepts dates and safely rounded source values", () => {
   const brief: MarketBriefContent = {
     headline: "市場研究",
-    summary: ["SPX 約為 7730，Breadth 約為 63%。", "QQQ Breadth 約為 65%。"],
+    summary: [
+      "SPX 約為 7730，Breadth 約為 63%。",
+      "QQQ Breadth 約為 65%，歷史案例 Breadth 為 62.57%。",
+    ],
     observations: [
       {
         label: "市場",
@@ -131,7 +134,7 @@ test("evaluation accepts dates and safely rounded source values", () => {
       },
       {
         label: "案例",
-        detail: "QQQ Breadth 約為 65%，案例日期為 2021-06-08。",
+        detail: "QQQ Breadth 約為 65%，歷史案例 Breadth 為 62.57%，日期為 2021-06-08。",
         evidenceIds: ["market:qqq-current", "analog:2021-06-08"],
       },
     ],
@@ -145,7 +148,7 @@ test("evaluation accepts dates and safely rounded source values", () => {
     qqqReturn20: 7.18,
     spxMaxDrawdown20: -1.44,
     qqqMaxDrawdown20: 0.02,
-    reasons: ["Breadth 63.61%"],
+    reasons: ["Breadth 62.57%"],
   };
   const checks = evaluateBrief(
     brief,

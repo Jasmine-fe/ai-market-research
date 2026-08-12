@@ -75,11 +75,14 @@ function collectAllowedNumbers(
         allowed.add(Number(match[0]));
       }
     }
+    if (Array.isArray(value)) value.forEach(addValue);
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      Object.values(value).forEach(addValue);
+    }
   };
-  Object.values(current.spx).forEach(addValue);
-  Object.values(current.qqq).forEach(addValue);
-  analogs.forEach((analog) => Object.values(analog).forEach(addValue));
-  evidence.forEach((item) => addValue(item.id));
+  addValue(current);
+  addValue(analogs);
+  addValue(evidence.map((item) => item.id));
   return [...allowed];
 }
 
