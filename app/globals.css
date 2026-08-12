@@ -233,9 +233,17 @@ h1 {
 }
 
 .metric-guide__grid h3 {
-  margin: 0 0 9px;
+  margin: 5px 0 9px;
   font-size: 16px;
   font-weight: 600;
+}
+
+.metric-guide__relation {
+  display: block;
+  color: #7f9188;
+  font: 600 10px/1.4 var(--font-geist-mono), monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .metric-guide__grid p {
