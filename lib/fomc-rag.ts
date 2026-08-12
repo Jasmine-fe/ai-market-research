@@ -121,15 +121,27 @@ export async function retrieveFomcEvidenceTool(
   const documents = nearestDocuments(analogDates);
   const fetched = await Promise.all(
     documents.map(async (document) => {
-      const response = await fetch(document.url, {
-        headers: {
-          accept: "text/html",
-          "user-agent": "Mozilla/5.0 (compatible; MarketMemoRAG/1.0)",
-        },
-        cache: "force-cache",
-      });
-      if (!response.ok) return [];
-      return extractChunks(await response.text()).map((text) => ({ document, text }));
+      try {
+        const response = await fetch(document.url, {
+          headers: {
+            accept: "text/html",
+            "user-agent": "Mozilla/5.0 (compatible; MarketMemoRAG/1.0)",
+          },
+          cache: "no-store",
+        });
+        if (!response.ok) return [];
+        return extractChunks(await response.text()).map((text) => ({
+          document,
+          text,
+        }));
+      } catch (error) {
+        console.warn(
+          "FOMC source unavailable",
+          document.id,
+          error instanceof Error ? error.message : "unknown fetch error",
+        );
+        return [];
+      }
     }),
   );
   const chunks = fetched.flat().slice(0, 36);
