@@ -1,12 +1,6 @@
-import {
-  MarketBriefRefusal,
-  runMarketBriefAgent,
-} from "../../../lib/market-agent";
-import {
-  appendExecutionLog,
-  type ExecutionLogSummary,
-} from "../../../lib/execution-log";
+import { appendExecutionLog, type ExecutionLogSummary } from "../../../lib/execution-log";
 import { hasOpenAIKey, ModelRefusalError } from "../../../lib/openai";
+import { ResearchRefusal, runMarketResearchAgent } from "../../../lib/research-agent";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +8,7 @@ async function persistExecution(summary: ExecutionLogSummary) {
   try {
     await appendExecutionLog(summary);
   } catch (error) {
-    console.error("Failed to persist Market Brief execution summary", error);
+    console.error("Failed to persist research execution", error);
   }
 }
 
@@ -26,77 +20,68 @@ function completionFields(startedAt: Date) {
   };
 }
 
-export async function POST() {
+export async function POST(request: Request) {
   const requestId = crypto.randomUUID();
   const startedAt = new Date();
   const requestedAt = startedAt.toISOString();
+  const body = (await request.json().catch(() => ({}))) as { question?: string };
+  const question = body.question?.trim() ?? "";
 
-  if (!hasOpenAIKey()) {
-    await persistExecution({
-      requestId,
-      requestedAt,
-      ...completionFields(startedAt),
-      status: "error",
-      errorCode: "AI_SERVICE_NOT_CONFIGURED",
-    });
+  if (question.length < 8 || question.length > 500) {
     return Response.json(
-      {
-        error: "AI_SERVICE_NOT_CONFIGURED",
-        message: "AI Market Brief 尚未連接模型服務，請先設定部署環境的 OpenAI API key。",
-      },
+      { error: "INVALID_QUESTION", message: "請輸入 8–500 個字的市場研究問題。" },
+      { status: 400 },
+    );
+  }
+  if (!hasOpenAIKey()) {
+    return Response.json(
+      { error: "AI_SERVICE_NOT_CONFIGURED", message: "AI 服務尚未完成設定。" },
       { status: 503 },
     );
   }
 
   try {
-    const result = await runMarketBriefAgent();
+    const result = await runMarketResearchAgent(question);
     await persistExecution({
       requestId,
       requestedAt,
       ...completionFields(startedAt),
       status: "success",
       model: result.model,
-      ragStatus: result.ragStatus,
-      analogDates: result.analogs.map((analog) => analog.date),
-      evidence: result.evidence.map((item) => ({
-        id: item.id,
-        relevance: item.relevance,
+      ragStatus: "grounded",
+      question,
+      queryRewrite: {
+        semantic: result.query.semantic,
+        keywords: result.query.keywords,
+      },
+      retrievedChunks: result.retrieval.evidence.map((item) => item.id),
+      searchStats: {
+        semanticCandidates: result.retrieval.semanticCandidates,
+        keywordCandidates: result.retrieval.keywordCandidates,
+      },
+      evaluationChecks: result.evaluation.checks.map(({ name, passed }) => ({
+        name,
+        passed,
       })),
-      steps: result.trace.map(({ step, status }) => ({ step, status })),
+      steps: result.trace.map((item) => ({ step: item.step, status: "completed" })),
     });
     return Response.json({ requestId, ...result });
   } catch (error) {
-    if (error instanceof MarketBriefRefusal) {
-      console.warn("Market Brief refused", error.code, error.internalDetails ?? "");
-      const details = (error.internalDetails ?? {}) as Partial<ExecutionLogSummary>;
-      const failedChecks = Array.isArray(details.failedChecks)
-        ? details.failedChecks.map((check) =>
-            typeof check === "string"
-              ? check
-              : (check as { name?: string }).name ?? "unknown",
-          )
-        : undefined;
+    if (error instanceof ResearchRefusal) {
+      const details = (error.internalDetails ?? {}) as Record<string, unknown>;
       await persistExecution({
         requestId,
         requestedAt,
         ...completionFields(startedAt),
         status: "refused",
-        model: details.model,
-        ragStatus: details.ragStatus,
-        analogDates: details.analogDates,
-        evidence: details.evidence,
-        steps: details.steps,
-        failedChecks,
+        question,
         errorCode: error.code,
+        queryRewrite: details.rewrite as ExecutionLogSummary["queryRewrite"],
       });
+      const status = error.code === "RAG_INDEX_EMPTY" ? 503 : 422;
       return Response.json(
-        {
-          requestId,
-          error: error.code,
-          refusal: true,
-          message: error.safeMessage,
-        },
-        { status: 422 },
+        { requestId, error: error.code, refusal: true, message: error.safeMessage },
+        { status },
       );
     }
     if (error instanceof ModelRefusalError) {
@@ -105,32 +90,25 @@ export async function POST() {
         requestedAt,
         ...completionFields(startedAt),
         status: "refused",
+        question,
         errorCode: "MODEL_REFUSAL",
       });
       return Response.json(
-        {
-          requestId,
-          error: "MODEL_REFUSAL",
-          refusal: true,
-          message: "模型拒絕產生本次內容，因此沒有顯示 AI 研究結論。",
-        },
+        { requestId, error: "MODEL_REFUSAL", refusal: true, message: "模型拒絕處理本次問題。" },
         { status: 422 },
       );
     }
-    console.error("Market Brief agent failed", error);
+    console.error("Market research failed", error);
     await persistExecution({
       requestId,
       requestedAt,
       ...completionFields(startedAt),
       status: "error",
-      errorCode: "MARKET_BRIEF_FAILED",
+      question,
+      errorCode: "MARKET_RESEARCH_FAILED",
     });
     return Response.json(
-      {
-        requestId,
-        error: "MARKET_BRIEF_FAILED",
-        message: "目前無法完成市場研究，可能是外部資料來源暫時沒有回應。請稍後再試。",
-      },
+      { error: "MARKET_RESEARCH_FAILED", message: "目前無法完成研究，請稍後再試。" },
       { status: 502 },
     );
   }

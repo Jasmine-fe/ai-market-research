@@ -28,11 +28,11 @@ export async function generateMetadata(): Promise<Metadata> {
       template: "%s · Market Memo",
     },
     description:
-      "結合市場寬度、歷史相似案例與聯準會官方文件的 AI 美股市場研究工具。",
+      "結合市場寬度與 FOMC Hybrid Search 的 AI 美股市場研究工具。",
     openGraph: {
       title: "Market Memo · AI 美股市場研究",
       description:
-        "從 SPX、QQQ 市場寬度找出歷史相似案例，產生附證據的 AI Market Brief。",
+        "以 keyword 與 semantic hybrid search 檢索十年 FOMC 文件，產生附引用的市場研究回答。",
       type: "website",
       url: origin,
       images: [
@@ -48,7 +48,7 @@ export async function generateMetadata(): Promise<Metadata> {
       card: "summary_large_image",
       title: "Market Memo · AI 美股市場研究",
       description:
-        "從 SPX、QQQ 市場寬度找出歷史相似案例，產生附證據的 AI Market Brief。",
+        "以 keyword 與 semantic hybrid search 檢索十年 FOMC 文件，產生附引用的市場研究回答。",
       images: [`${origin}/og.png`],
     },
   };

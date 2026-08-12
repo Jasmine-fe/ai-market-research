@@ -31,17 +31,33 @@ async function openAIRequest(path: string, body: unknown) {
   return response.json() as Promise<Record<string, unknown>>;
 }
 
-export async function embedTexts(texts: string[]) {
+export const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
+export const DEFAULT_EMBEDDING_DIMENSIONS = 256;
+
+export async function embedTexts(
+  texts: string[],
+  dimensions = DEFAULT_EMBEDDING_DIMENSIONS,
+) {
   const payload = await openAIRequest("/embeddings", {
-    model: process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small",
+    model: process.env.OPENAI_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL,
     input: texts,
     encoding_format: "float",
+    dimensions,
   });
   const data = payload.data as Array<{ embedding: number[] }> | undefined;
   if (!data || data.length !== texts.length) {
     throw new Error("Embedding API 回傳的向量數量不正確。");
   }
   return data.map((item) => item.embedding);
+}
+
+export function embeddingConfiguration() {
+  return {
+    model: process.env.OPENAI_EMBEDDING_MODEL ?? DEFAULT_EMBEDDING_MODEL,
+    dimensions: Number(
+      process.env.OPENAI_EMBEDDING_DIMENSIONS ?? DEFAULT_EMBEDDING_DIMENSIONS,
+    ),
+  };
 }
 
 export async function generateStructuredResponse(

@@ -560,7 +560,7 @@ export default async function Home() {
           <p className="hero__copy">
             分別觀察 S&amp;P 500 與 QQQ
             離短、中期平均成本多遠，以及各自有多少成分股共同參與行情。
-            儀表板先呈現可核對的趨勢數據，AI Market Brief 再連結歷史案例與官方證據。
+            儀表板先呈現可核對的趨勢數據，AI Market Research 再從過去十年的 FOMC 文件搜尋官方證據。
           </p>
         </div>
         <div className="as-of">

@@ -13,6 +13,11 @@ export type ExecutionLogSummary = {
   steps?: Array<{ step: string; status: string }>;
   failedChecks?: string[];
   errorCode?: string;
+  question?: string;
+  queryRewrite?: { semantic?: string; keywords?: string[] };
+  retrievedChunks?: string[];
+  searchStats?: { semanticCandidates?: number; keywordCandidates?: number };
+  evaluationChecks?: Array<{ name: string; passed: boolean }>;
 };
 
 const CREATE_EXECUTION_TABLE = `
@@ -109,6 +114,11 @@ export async function appendExecutionLog(summary: ExecutionLogSummary) {
         steps: summary.steps ?? [],
         failedChecks: summary.failedChecks ?? [],
         errorCode: summary.errorCode ?? null,
+        question: summary.question ?? null,
+        queryRewrite: summary.queryRewrite ?? null,
+        retrievedChunks: summary.retrievedChunks ?? [],
+        searchStats: summary.searchStats ?? null,
+        evaluationChecks: summary.evaluationChecks ?? [],
       }),
     )
     .run();
