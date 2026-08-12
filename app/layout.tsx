@@ -24,15 +24,15 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase: new URL(origin),
     title: {
-      default: "美股市場寬度儀表板",
-      template: "%s · 美股市場寬度儀表板",
+      default: "Market Memo · AI 美股市場研究",
+      template: "%s · Market Memo",
     },
     description:
-      "每日追蹤 S&P 500、QQQ、MA20／MA60 乖離率與等權 Breadth 20。",
+      "結合市場寬度、歷史相似案例與聯準會官方文件的 AI 美股市場研究工具。",
     openGraph: {
-      title: "美股市場寬度儀表板",
+      title: "Market Memo · AI 美股市場研究",
       description:
-        "同時觀察 SPX、QQQ 的 MA20／MA60 乖離率與各自等權 Breadth 20。",
+        "從 SPX、QQQ 市場寬度找出歷史相似案例，產生附證據的 AI Market Brief。",
       type: "website",
       url: origin,
       images: [
@@ -40,15 +40,15 @@ export async function generateMetadata(): Promise<Metadata> {
           url: `${origin}/og.png`,
           width: 1536,
           height: 1024,
-          alt: "美股市場寬度儀表板",
+          alt: "Market Memo AI 美股市場研究",
         },
       ],
     },
     twitter: {
       card: "summary_large_image",
-      title: "美股市場寬度儀表板",
+      title: "Market Memo · AI 美股市場研究",
       description:
-        "同時觀察 SPX、QQQ 的 MA20／MA60 乖離率與各自等權 Breadth 20。",
+        "從 SPX、QQQ 市場寬度找出歷史相似案例，產生附證據的 AI Market Brief。",
       images: [`${origin}/og.png`],
     },
   };

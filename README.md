@@ -1,98 +1,50 @@
-# vinext-starter
+# Market Memo
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+Market Memo 是一個美股市場寬度與 AI 研究工具，追蹤 S&P 500、QQQ、MA20／MA60 乖離率，以及各自的等權 Breadth 20。
 
-## Prerequisites
+## AI Market Brief MVP
 
-- Node.js `>=22.13.0`
+首頁的「分析目前市場」執行一條固定、可檢查的研究流程：
 
-## Quick Start
+1. **Tool calling**：取得 SPX、QQQ 與 Breadth 歷史資料。
+2. **Tool calling**：以價格乖離、Breadth 水準及五日動能搜尋三個歷史相似案例，計算後續 20 日報酬與最大回撤。
+3. **RAG**：取得最接近案例日期的 Federal Reserve FOMC 會議紀錄，以 embedding similarity 檢索相關段落。
+4. **LLM application / Agent workflow**：將市場資料、歷史案例與官方文件整合成繁體中文結構化研究摘要。
+5. **AI evaluation**：檢查輸出結構、證據 ID、歷史結果及禁止交易指令。
+
+AI 僅提供有證據的市場研究，不提供買賣、部位或報酬保證。輸出若未通過引用、數字或安全性檢查，API 會 fail closed，不回傳研究結論。
+
+## Execution log
+
+每次 AI Market Brief request 都會保存一筆精簡摘要，包含 request ID、執行時間、耗時、結果狀態、模型、RAG 狀態、證據 ID、工作流程步驟及失敗檢查名稱。Log 不保存 API key、完整 prompt 或 FOMC 文件全文。
+
+- Sites 部署環境使用 D1 的 `market_brief_executions` table。
+- 本機 production preview 使用 `.local-data/market-brief-executions.jsonl`，此目錄不會提交至 Git。
+
+## Local development
+
+需要 Node.js `>=22.13.0`。
 
 ```bash
+cp .env.example .env.local
 npm install
 npm run dev
+```
+
+在 `.env.local` 設定伺服器端 `OPENAI_API_KEY`。金鑰不會傳送至瀏覽器。
+
+## Validation
+
+```bash
 npm run build
+npm run lint
+npm test
 ```
 
-This starter does not use `wrangler.jsonc`.
+## Data sources
 
-## Included Shape
+- TradingView：即時／延遲價格卡片
+- Barchart：S&P 500、QQQ 與 Breadth 歷史日線
+- Federal Reserve：FOMC 官方會議紀錄
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
-
-## Workspace Auth Headers
-
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
-
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
-
-Treat the full name as optional and fall back to email when it is absent:
-
-```tsx
-import { headers } from "next/headers";
-
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
-
-  const displayName = fullName ?? email;
-  // ...
-}
-```
-
-## Optional Dispatch-Owned ChatGPT Sign-In
-
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
-
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
-
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
-
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
-
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
-
-## Useful Commands
-
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+資料可能延遲或暫時中斷，網站內容不構成投資建議。

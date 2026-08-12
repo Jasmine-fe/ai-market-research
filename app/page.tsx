@@ -1,6 +1,11 @@
 import CombinedTrendChart, {
   type CombinedHistoryPoint,
 } from "./CombinedTrendChart";
+import MarketBrief from "./MarketBrief";
+import {
+  parseBreadthSnapshot,
+  type BreadthSnapshot,
+} from "../lib/barchart-breadth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,14 +17,6 @@ type MarketSnapshot = {
   high52w: number;
   low52w: number;
   delayed: boolean;
-};
-
-type BreadthSnapshot = {
-  value: number;
-  changePoints: number;
-  tradeDate: string;
-  high52w: number | null;
-  low52w: number | null;
 };
 
 type MarketState = ReturnType<typeof getMarketState>;
@@ -83,17 +80,6 @@ async function getMarketSnapshot(
   }
 }
 
-function firstNumber(source: string, patterns: RegExp[]) {
-  for (const pattern of patterns) {
-    const match = source.match(pattern);
-    if (match?.[1]) {
-      const value = Number(match[1].replace(/[+,]/g, ""));
-      if (Number.isFinite(value)) return value;
-    }
-  }
-  return null;
-}
-
 async function getBreadthSnapshot(
   symbol: "S5TW" | "NDTW",
 ): Promise<BreadthSnapshot | null> {
@@ -113,30 +99,7 @@ async function getBreadthSnapshot(
 
     if (!response.ok) return null;
     const html = await response.text();
-    const quote = html.match(
-      new RegExp(
-        `"symbol":"\\$${symbol}","symbolName":"[^"]+","symbolType":9,"lastPrice":"([^"]+)","priceChange":"([^"]+)","percentChange":"[^"]+"[^}]*"tradeTime":"([^"]+)"`,
-      ),
-    );
-    if (!quote) return null;
-
-    const value = Number(quote[1].replace(/,/g, ""));
-    const changePoints = Number(quote[2].replace(/[+,]/g, ""));
-    if (!Number.isFinite(value) || !Number.isFinite(changePoints)) return null;
-
-    return {
-      value,
-      changePoints,
-      tradeDate: quote[3].replaceAll("\\/", "/"),
-      high52w: firstNumber(html, [
-        /&quot;highPrice1y&quot;:([\d.]+)/,
-        /"highPrice1y":([\d.]+)/,
-      ]),
-      low52w: firstNumber(html, [
-        /&quot;lowPrice1y&quot;:([\d.]+)/,
-        /"lowPrice1y":([\d.]+)/,
-      ]),
-    };
+    return parseBreadthSnapshot(html, symbol);
   } catch {
     return null;
   }
@@ -581,7 +544,7 @@ export default async function Home() {
           </span>
           <span>
             Market Memo
-            <small>US Breadth Monitor</small>
+            <small>US Breadth + AI Research</small>
           </span>
         </a>
         <div className="freshness">
@@ -597,7 +560,7 @@ export default async function Home() {
           <p className="hero__copy">
             分別觀察 S&amp;P 500 與 QQQ
             離短、中期平均成本多遠，以及各自有多少成分股共同參與行情。
-            第一版先讓趨勢數據清楚、來源可核對。
+            儀表板先呈現可核對的趨勢數據，AI Market Brief 再連結歷史案例與官方證據。
           </p>
         </div>
         <div className="as-of">
@@ -608,6 +571,8 @@ export default async function Home() {
           <small>S&amp;P 500 · Nasdaq-100 收盤資料</small>
         </div>
       </section>
+
+      <MarketBrief />
 
       <MarketSection
         id="spx"
@@ -723,7 +688,8 @@ export default async function Home() {
           <strong>資料來源</strong>
           <p>
             即時卡片：TradingView 延遲行情與 Barchart S5TW、NDTW；歷史雙層圖：
-            Barchart 日線資料。資料可能延遲或中斷，請以來源頁面為準。
+            Barchart 日線資料；AI Brief 文件：Federal Reserve FOMC 會議紀錄。
+            資料可能延遲或中斷，請以來源頁面為準。
           </p>
         </div>
         <p>
