@@ -112,9 +112,9 @@ export default function MarketBrief() {
       <div className="research-lab__header">
         <div>
           <div className="research-lab__label"><span>AI</span> AI MARKET RESEARCH</div>
-          <h2 id="research-heading">從 FOMC 原文找答案</h2>
+          <h2 id="research-heading">從歷史中學習</h2>
           <p>
-            搜尋過去十年的 FOMC 會議紀錄，以 keyword 與 semantic hybrid search 找出證據，再由 AI 整理附引用的回答。
+            搜尋過去十年的 FOMC 聯準會會議紀錄，以 keyword 與 semantic hybrid search 找出證據，再由 AI 整理附引用的回答。
           </p>
         </div>
         <div className="research-lab__stack" aria-label="RAG 技術">

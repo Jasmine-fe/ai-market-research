@@ -22,7 +22,8 @@ test("server-renders the market dashboard and AI research entry point", async ()
   assert.match(html, /Market Memo · AI 美股市場研究/);
   assert.match(html, /美股市場寬度儀表板/);
   assert.match(html, /AI MARKET RESEARCH/);
-  assert.match(html, /從 FOMC 原文找答案/);
+  assert.match(html, /從歷史中學習/);
+  assert.match(html, /FOMC 聯準會會議紀錄/);
   assert.match(html, /開始研究/);
   assert.match(html, /HYBRID SEARCH/);
   assert.match(html, /AI Engineering Architecture/);
