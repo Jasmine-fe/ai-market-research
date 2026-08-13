@@ -1,6 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import {
+  failedCheckLabel,
+  refusalReasonLabel,
+} from "../lib/research-refusal-display";
 
 const SUGGESTED_QUESTIONS = [
   "市場廣度轉弱時，FOMC 通常關注哪些金融市場風險？",
@@ -60,6 +64,9 @@ export default function MarketBrief() {
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [message, setMessage] = useState("");
   const [refused, setRefused] = useState(false);
+  const [errorCode, setErrorCode] = useState("");
+  const [failedChecks, setFailedChecks] = useState<string[]>([]);
+  const [requestId, setRequestId] = useState("");
 
   async function research(event: FormEvent) {
     event.preventDefault();
@@ -68,6 +75,9 @@ export default function MarketBrief() {
     setStatus("loading");
     setMessage("");
     setRefused(false);
+    setErrorCode("");
+    setFailedChecks([]);
+    setRequestId("");
     setResult(null);
     try {
       const response = await fetch("/api/market-brief", {
@@ -76,11 +86,17 @@ export default function MarketBrief() {
         body: JSON.stringify({ question: trimmed }),
       });
       const payload = (await response.json()) as ResearchResponse & {
+        requestId?: string;
+        error?: string;
         message?: string;
         refusal?: boolean;
+        failedChecks?: string[];
       };
       if (!response.ok) {
         setRefused(payload.refusal === true);
+        setErrorCode(payload.error ?? "");
+        setFailedChecks(payload.failedChecks ?? []);
+        setRequestId(payload.requestId ?? "");
         throw new Error(payload.message ?? "無法完成研究。");
       }
       setResult(payload);
@@ -152,8 +168,27 @@ export default function MarketBrief() {
 
       {status === "error" && (
         <div className="research-error" role="alert">
-          <strong>{refused ? "本次未產生研究結論" : "暫時無法完成研究"}</strong>
-          <p>{message}</p>
+          <div>
+            <strong>{refused ? "本次未產生研究結論" : "暫時無法完成研究"}</strong>
+            {refused && (
+              <div className="research-error__reason">
+                <span>原因</span>
+                <b>{refusalReasonLabel(errorCode)}</b>
+              </div>
+            )}
+            <p>{message}</p>
+            {failedChecks.length > 0 && (
+              <div className="research-error__checks">
+                <span>未通過的檢查</span>
+                <ul>
+                  {failedChecks.map((check) => (
+                    <li key={check}>{failedCheckLabel(check)}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            {requestId && <small>Request ID · {requestId}</small>}
+          </div>
         </div>
       )}
 

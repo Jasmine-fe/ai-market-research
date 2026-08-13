@@ -92,7 +92,15 @@ export async function POST(request: Request) {
       });
       const status = error.code === "RAG_INDEX_EMPTY" ? 503 : 422;
       return Response.json(
-        { requestId, error: error.code, refusal: true, message: error.safeMessage },
+        {
+          requestId,
+          error: error.code,
+          refusal: true,
+          message: error.safeMessage,
+          failedChecks: evaluationChecks
+            ?.filter((check) => !check.passed)
+            .map((check) => check.name) ?? [],
+        },
         { status },
       );
     }

@@ -7,6 +7,10 @@ import {
 } from "../lib/fomc-chunking.ts";
 import { fuseHybridRanks } from "../lib/hybrid-ranking.ts";
 import { hasRetrievalCandidates } from "../lib/retrieval-availability.ts";
+import {
+  failedCheckLabel,
+  refusalReasonLabel,
+} from "../lib/research-refusal-display.ts";
 
 test("section-aware chunking never crosses section boundaries", () => {
   const paragraph = "Financial conditions remained restrictive. ".repeat(180);
@@ -82,5 +86,16 @@ test("retrieval remains available when either search path returns candidates", (
   assert.equal(
     hasRetrievalCandidates({ semanticCandidates: 0, keywordCandidates: 0 }),
     false,
+  );
+});
+
+test("refusal details use clear Traditional Chinese labels", () => {
+  assert.equal(
+    refusalReasonLabel("OUTPUT_GUARDRAIL_REJECTED"),
+    "回答未通過品質檢查",
+  );
+  assert.equal(
+    failedCheckLabel("Citation support"),
+    "引用原文無法直接支持結論",
   );
 });
