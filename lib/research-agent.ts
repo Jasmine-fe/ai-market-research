@@ -1,6 +1,7 @@
 import { hybridSearchFomc, rewriteResearchQuery } from "./hybrid-search";
 import { generateStructuredResponse } from "./openai";
 import { normalizeResearchText } from "./traditional-chinese";
+import { hasRetrievalCandidates } from "./retrieval-availability";
 
 const ANSWER_SCHEMA = {
   type: "object",
@@ -139,7 +140,7 @@ export async function runMarketResearchAgent(question: string) {
   const retrieval = await timed("retrieve", "執行 keyword 與 semantic hybrid search", () =>
     hybridSearchFomc(rewrite, asOf),
   );
-  if (!retrieval.semanticCandidates) {
+  if (!hasRetrievalCandidates(retrieval)) {
     throw new ResearchRefusal(
       "RAG_INDEX_EMPTY",
       "FOMC 知識庫仍在建立，請稍後再執行研究。",
@@ -187,8 +188,8 @@ export async function runMarketResearchAgent(question: string) {
   const validIds = new Set(retrieval.evidence.map((item) => item.id));
   const checks = [
     {
-      name: "Hybrid retrieval",
-      passed: retrieval.semanticCandidates > 0 && retrieval.keywordCandidates > 0,
+      name: "Retrieval availability",
+      passed: hasRetrievalCandidates(retrieval),
       detail: `Semantic ${retrieval.semanticCandidates} · Keyword ${retrieval.keywordCandidates}`,
     },
     {

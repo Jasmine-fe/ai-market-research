@@ -614,9 +614,14 @@ export default async function Home() {
             <small>US Breadth + AI Research</small>
           </span>
         </a>
-        <div className="freshness">
-          <span className="freshness__dot" />
-          每次開啟重新取得資料
+        <div className="site-header__actions">
+          <a className="architecture-link" href="/architecture">
+            AI Engineering Architecture <span aria-hidden="true">↗</span>
+          </a>
+          <div className="freshness">
+            <span className="freshness__dot" />
+            每次開啟重新取得資料
+          </div>
         </div>
       </header>
 

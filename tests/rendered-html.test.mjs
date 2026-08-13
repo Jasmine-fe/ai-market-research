@@ -25,6 +25,8 @@ test("server-renders the market dashboard and AI research entry point", async ()
   assert.match(html, /從 FOMC 原文找答案/);
   assert.match(html, /開始研究/);
   assert.match(html, /HYBRID SEARCH/);
+  assert.match(html, /AI Engineering Architecture/);
+  assert.match(html, /href="\/architecture"/);
   assert.match(html, /S&amp;P 500/);
   assert.match(html, /QQQ/);
 });

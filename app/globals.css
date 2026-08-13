@@ -104,6 +104,30 @@ main {
   font-size: 12px;
 }
 
+.site-header__actions {
+  display: flex;
+  gap: 22px;
+  align-items: center;
+}
+
+.architecture-link {
+  padding: 9px 12px;
+  border: 1px solid rgba(126, 226, 168, 0.25);
+  border-radius: 8px;
+  color: #bcd0c6;
+  background: rgba(126, 226, 168, 0.045);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+  letter-spacing: 0.035em;
+  transition: border-color 160ms ease, color 160ms ease, background 160ms ease;
+}
+
+.architecture-link:hover {
+  border-color: rgba(126, 226, 168, 0.5);
+  color: var(--green);
+  background: rgba(126, 226, 168, 0.08);
+}
+
 .freshness__dot {
   width: 7px;
   height: 7px;
@@ -1456,8 +1480,20 @@ footer p {
     min-height: 70px;
   }
 
+  .site-header__actions {
+    gap: 8px;
+  }
+
+  .architecture-link {
+    max-width: 118px;
+    padding: 7px 9px;
+    font-size: 9px;
+    line-height: 1.35;
+    text-align: center;
+  }
+
   .freshness {
-    max-width: 130px;
+    max-width: 92px;
     text-align: right;
   }
 

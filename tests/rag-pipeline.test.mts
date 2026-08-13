@@ -6,6 +6,7 @@ import {
   extractFomcSections,
 } from "../lib/fomc-chunking.ts";
 import { fuseHybridRanks } from "../lib/hybrid-ranking.ts";
+import { hasRetrievalCandidates } from "../lib/retrieval-availability.ts";
 
 test("section-aware chunking never crosses section boundaries", () => {
   const paragraph = "Financial conditions remained restrictive. ".repeat(180);
@@ -67,4 +68,19 @@ test("hybrid results keep at most two chunks per document", () => {
   const result = fuseHybridRanks(semantic, [], 6);
   assert.equal(result.filter((item) => item.documentId === "same-document").length, 2);
   assert.ok(result.some((item) => item.id === "other"));
+});
+
+test("retrieval remains available when either search path returns candidates", () => {
+  assert.equal(
+    hasRetrievalCandidates({ semanticCandidates: 3, keywordCandidates: 0 }),
+    true,
+  );
+  assert.equal(
+    hasRetrievalCandidates({ semanticCandidates: 0, keywordCandidates: 4 }),
+    true,
+  );
+  assert.equal(
+    hasRetrievalCandidates({ semanticCandidates: 0, keywordCandidates: 0 }),
+    false,
+  );
 });

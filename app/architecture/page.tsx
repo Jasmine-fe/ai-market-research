@@ -47,7 +47,7 @@ const systemNodes = [
 ];
 
 const evaluationChecks = [
-  ["Hybrid retrieval", "Both semantic and keyword retrieval return candidates."],
+  ["Retrieval availability", "Semantic or keyword retrieval returns candidates."],
   ["Citation validity", "Every answer point references a retrieved chunk ID."],
   ["Citation support", "A second LLM pass verifies that evidence supports each claim."],
   ["Temporal safety", "No document published after the request date can be used."],
