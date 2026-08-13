@@ -6,20 +6,28 @@ An AI-powered US market breadth dashboard and FOMC research assistant. It combin
 
 ## Product demo
 
-### Market breadth dashboard
+### Product overview
 
-The dashboard explains MA20, MA60, Breadth, and Bias before presenting S&P 500 and Nasdaq-100 market participation, price position, and historical trends.
+The dashboard starts with plain-language definitions of MA20, MA60, Breadth, and Bias so new users can understand the indicators before interpreting market conditions.
 
 <p align="center">
-  <img src="docs/images/market-dashboard.jpg" alt="Market Memo US market breadth dashboard" width="430" />
+  <img src="docs/images/product-overview.png" alt="Market Memo dashboard overview and indicator definitions" width="100%" />
 </p>
 
-### FOMC research assistant
+### Market breadth indicators
 
-Users can choose a suggested question or enter their own. The system retrieves official FOMC evidence, generates a Traditional Chinese answer with citations, and returns no conclusion when retrieval or output checks fail.
+S&P 500 and Nasdaq-100 sections combine index price, MA20/MA60 Bias, Breadth 20/60, and a concise market-state interpretation.
 
 <p align="center">
-  <img src="docs/images/ai-research.jpg" alt="FOMC RAG research question interface" width="430" />
+  <img src="docs/images/market-indicators.png" alt="S&P 500 price, moving-average Bias, and Breadth indicators" width="100%" />
+</p>
+
+### FOMC RAG research answer
+
+Users can choose a suggested question or enter their own. The system retrieves official FOMC evidence and generates a Traditional Chinese answer with chunk-level citations. When a check fails, it returns an explicit refusal reason instead of a partially grounded answer.
+
+<p align="center">
+  <img src="docs/images/rag-research-answer.png" alt="FOMC RAG research interface with a cited evaluated answer" width="100%" />
 </p>
 
 ## How one research request works
