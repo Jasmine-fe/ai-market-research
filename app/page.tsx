@@ -26,6 +26,12 @@ type HistoryPoint = {
   close: number;
 };
 
+type ComputedBreadth = {
+  value: number;
+  above: number;
+  total: number;
+};
+
 async function getMarketSnapshot(
   ticker: "SP:SPX" | "NASDAQ:QQQ",
 ): Promise<MarketSnapshot | null> {
@@ -100,6 +106,42 @@ async function getBreadthSnapshot(
     if (!response.ok) return null;
     const html = await response.text();
     return parseBreadthSnapshot(html, symbol);
+  } catch {
+    return null;
+  }
+}
+
+async function getBreadth60(
+  symbolset: "SYML:SP;SPX" | "SYML:NASDAQ;NDX",
+): Promise<ComputedBreadth | null> {
+  try {
+    const response = await fetch(
+      "https://scanner.tradingview.com/america/scan",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          symbols: { symbolset: [symbolset] },
+          columns: ["close", "SMA60"],
+          range: [0, 600],
+        }),
+        cache: "no-store",
+      },
+    );
+    if (!response.ok) return null;
+    const payload = (await response.json()) as {
+      data?: Array<{ d?: unknown[] }>;
+    };
+    const rows = (payload.data ?? []).flatMap((row) => {
+      const close = row.d?.[0];
+      const sma60 = row.d?.[1];
+      return typeof close === "number" && typeof sma60 === "number"
+        ? [{ close, sma60 }]
+        : [];
+    });
+    if (!rows.length) return null;
+    const above = rows.filter((row) => row.close > row.sma60).length;
+    return { value: (above / rows.length) * 100, above, total: rows.length };
   } catch {
     return null;
   }
@@ -280,6 +322,8 @@ function MetricCard({
   unit,
   detail,
   change,
+  secondaryValue,
+  secondaryLabel,
   tone = "default",
 }: {
   eyebrow: string;
@@ -287,6 +331,8 @@ function MetricCard({
   unit?: string;
   detail: string;
   change?: string;
+  secondaryValue?: string;
+  secondaryLabel?: string;
   tone?: "default" | "positive" | "negative";
 }) {
   return (
@@ -295,9 +341,17 @@ function MetricCard({
         <p>{eyebrow}</p>
         {change && <span>{change}</span>}
       </div>
-      <div className="metric-card__value">
-        {value}
-        {unit && <small>{unit}</small>}
+      <div className="metric-card__value-row">
+        <div className="metric-card__value">
+          {value}
+          {unit && <small>{unit}</small>}
+        </div>
+        {secondaryValue ? (
+          <div className="metric-card__secondary">
+            <strong>{secondaryValue}</strong>
+            <span>{secondaryLabel}</span>
+          </div>
+        ) : null}
       </div>
       <p className="metric-card__detail">{detail}</p>
     </article>
@@ -313,6 +367,7 @@ function MarketSection({
   breadthLabel,
   market,
   breadth,
+  breadth60,
   bias20,
   bias60,
   state,
@@ -328,6 +383,7 @@ function MarketSection({
   breadthLabel: string;
   market: MarketSnapshot | null;
   breadth: BreadthSnapshot | null;
+  breadth60: ComputedBreadth | null;
   bias20: number | null;
   bias60: number | null;
   state: MarketState;
@@ -354,7 +410,7 @@ function MarketSection({
         </div>
       </div>
 
-      <div className="metrics" aria-label={`${title}主要數據`}>
+      <div className="metrics metrics--five" aria-label={`${title}主要數據`}>
         <MetricCard
           eyebrow={priceLabel}
           value={market ? formatNumber(market.close) : "—"}
@@ -375,20 +431,16 @@ function MarketSection({
           }
         />
         <MetricCard
-          eyebrow={`${priceLabel} · MA20`}
+          eyebrow={`${priceLabel} · MA20 (BIAS)`}
           value={market ? formatNumber(market.sma20) : "—"}
-          detail="過去20個交易日的平均價格"
-        />
-        <MetricCard
-          eyebrow="PRICE · MA20 BIAS"
-          value={bias20 != null ? signed(bias20) : "—"}
-          unit="%"
+          secondaryValue={bias20 != null ? `${signed(bias20)}%` : "—"}
+          secondaryLabel="BIAS"
           detail={
             bias20 == null
-              ? "無法計算"
+              ? "MA20 與乖離率暫時無法計算"
               : bias20 >= 0
-                ? "目前價格位於 MA20 之上"
-                : "目前價格位於 MA20 之下"
+                ? "20日均線 · 目前價格位於 MA20 之上"
+                : "20日均線 · 目前價格位於 MA20 之下"
           }
           tone={
             bias20 == null
@@ -399,20 +451,16 @@ function MarketSection({
           }
         />
         <MetricCard
-          eyebrow={`${priceLabel} · MA60`}
+          eyebrow={`${priceLabel} · MA60 (BIAS)`}
           value={market ? formatNumber(market.sma60) : "—"}
-          detail="過去60個交易日的平均價格"
-        />
-        <MetricCard
-          eyebrow="PRICE · MA60 BIAS"
-          value={bias60 != null ? signed(bias60) : "—"}
-          unit="%"
+          secondaryValue={bias60 != null ? `${signed(bias60)}%` : "—"}
+          secondaryLabel="BIAS"
           detail={
             bias60 == null
-              ? "無法計算"
+              ? "MA60 與乖離率暫時無法計算"
               : bias60 >= 0
-                ? "目前價格位於 MA60 之上"
-                : "目前價格位於 MA60 之下"
+                ? "60日均線 · 目前價格位於 MA60 之上"
+                : "60日均線 · 目前價格位於 MA60 之下"
           }
           tone={
             bias60 == null
@@ -436,6 +484,23 @@ function MarketSection({
             breadth && breadth.value >= 60
               ? "positive"
               : breadth && breadth.value < 40
+                ? "negative"
+                : "default"
+          }
+        />
+        <MetricCard
+          eyebrow={`${priceLabel} · BREADTH 60`}
+          value={breadth60 ? formatNumber(breadth60.value) : "—"}
+          unit="%"
+          detail={
+            breadth60
+              ? `${breadth60.above} / ${breadth60.total} 檔成分股站上各自 MA60`
+              : "TradingView 成分股資料暫時無法取得"
+          }
+          tone={
+            breadth60 && breadth60.value >= 60
+              ? "positive"
+              : breadth60 && breadth60.value < 40
                 ? "negative"
                 : "default"
           }
@@ -515,12 +580,14 @@ function MarketSection({
 }
 
 export default async function Home() {
-  const [spx, spxBreadth, qqq, qqqBreadth, spxHistory, qqqHistory] =
+  const [spx, spxBreadth, spxBreadth60, qqq, qqqBreadth, qqqBreadth60, spxHistory, qqqHistory] =
     await Promise.all([
       getMarketSnapshot("SP:SPX"),
       getBreadthSnapshot("S5TW"),
+      getBreadth60("SYML:SP;SPX"),
       getMarketSnapshot("NASDAQ:QQQ"),
       getBreadthSnapshot("NDTW"),
+      getBreadth60("SYML:NASDAQ;NDX"),
       getCombinedHistory("$SPX", "$S5TW"),
       getCombinedHistory("QQQ", "$NDTW"),
     ]);
@@ -625,6 +692,7 @@ export default async function Home() {
         breadthLabel="S&P 500 · BREADTH 20"
         market={spx}
         breadth={spxBreadth}
+        breadth60={spxBreadth60}
         bias20={spxBias}
         bias60={spxBias60}
         state={spxState}
@@ -642,6 +710,7 @@ export default async function Home() {
         breadthLabel="NASDAQ-100 · BREADTH 20"
         market={qqq}
         breadth={qqqBreadth}
+        breadth60={qqqBreadth60}
         bias20={qqqBias}
         bias60={qqqBias60}
         state={qqqState}
@@ -662,11 +731,11 @@ export default async function Home() {
             </p>
           </div>
           <div className="formula">
-            <span>傳統等權Breadth 20</span>
-            <code>高於各自MA20的成分股數 ÷ 有效成分股數 × 100</code>
+            <span>傳統等權 Breadth 20／60</span>
+            <code>高於各自 MA20 或 MA60 的成分股數 ÷ 有效成分股數 × 100</code>
             <p>
               分別衡量 S&amp;P 500 與 Nasdaq-100
-              有多少股票共同參與，每檔股票只算一票。
+              在短期與中期有多少股票共同參與，每檔股票只算一票。
             </p>
           </div>
         </article>
