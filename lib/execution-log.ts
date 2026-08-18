@@ -10,7 +10,7 @@ export type ExecutionLogSummary = {
   ragStatus?: "grounded" | "insufficient";
   analogDates?: string[];
   evidence?: Array<{ id: string; relevance: number }>;
-  steps?: Array<{ step: string; status: string }>;
+  steps?: Array<{ step: string; status: string; attempt?: number }>;
   failedChecks?: string[];
   errorCode?: string;
   question?: string;
@@ -18,6 +18,13 @@ export type ExecutionLogSummary = {
   retrievedChunks?: string[];
   searchStats?: { semanticCandidates?: number; keywordCandidates?: number };
   evaluationChecks?: Array<{ name: string; passed: boolean }>;
+  workflow?: {
+    framework: "LangGraph";
+    corrections: number;
+    retrievalAttempts: number;
+    generationAttempts: number;
+    correctionReason?: string;
+  };
 };
 
 const CREATE_EXECUTION_TABLE = `
@@ -119,6 +126,7 @@ export async function appendExecutionLog(summary: ExecutionLogSummary) {
         retrievedChunks: summary.retrievedChunks ?? [],
         searchStats: summary.searchStats ?? null,
         evaluationChecks: summary.evaluationChecks ?? [],
+        workflow: summary.workflow ?? null,
       }),
     )
     .run();

@@ -44,8 +44,9 @@ Reciprocal Rank Fusion → source diversity → top 6 evidence chunks
 Structured LLM answer with chunk-level citations
     ↓
 Citation, temporal, retrieval, and safety evaluation
-    ↓
-Cited answer  OR  explicit refusal reason
+    ├── Pass → cited answer
+    ├── Citation / retrieval failure → LangGraph corrective retry (maximum once)
+    └── Safety failure or second failure → explicit refusal reason
 ```
 
 Semantic and keyword search each retrieve up to 30 candidates. These are ranking pools, not LLM context: RRF merges them, limits each document to two chunks, and sends only the final six evidence chunks to generation.
@@ -55,9 +56,9 @@ Semantic and keyword search each retrieve up to 30 candidates. These are ranking
 | Capability | Implementation |
 | --- | --- |
 | LLM application | Query rewriting, structured outputs, grounded Traditional Chinese answers |
-| RAG | Ten years of official FOMC minutes with section-aware recursive chunking |
+| RAG | LangChain Documents and section-aware RecursiveCharacterTextSplitter over ten years of official FOMC minutes |
 | Hybrid retrieval | OpenAI embeddings + exact cosine similarity + FTS5/BM25 + RRF |
-| Agent workflow | Bounded rewrite → retrieve → construct context → answer → evaluate sequence |
+| Agent workflow | LangGraph StateGraph with conditional edges and one bounded corrective RAG retry |
 | AI evaluation | Citation validity/support, temporal safety, retrieval availability, and trading-instruction checks |
 | Guardrails | Fail-closed refusal with a user-visible reason, failed checks, and request ID |
 | Observability | Persistent execution summaries with retrieval statistics and evaluation results |
@@ -66,7 +67,7 @@ Semantic and keyword search each retrieve up to 30 candidates. These are ranking
 
 1. Discover official FOMC minutes from a rolling ten-year window.
 2. Parse document sections and clean paragraph content.
-3. Apply section-aware recursive chunking at 500–700 tokens with 90-token overlap.
+3. Apply LangChain section-aware recursive chunking at 500–700 tokens with 90-token overlap.
 4. Generate 256-dimensional OpenAI embeddings.
 5. Store documents, chunks, metadata, Float32 vectors, and FTS5 indexes in Cloudflare D1.
 6. Run semantic and keyword retrieval independently, then fuse rankings with RRF.
@@ -84,11 +85,11 @@ An answer is shown only when every post-generation check passes:
 - No document was published after the request date.
 - The answer contains no trading or position-sizing instruction.
 
-If a check fails, the UI shows the refusal category, the failed check, and a request ID for log correlation instead of returning a partially grounded conclusion.
+Citation or retrieval failures trigger one LangGraph corrective cycle: rewrite the query, retrieve again, regenerate, and reevaluate. Safety failures stop immediately. If the corrective result still fails, the UI shows the refusal category, failed check, and request ID instead of returning a partially grounded conclusion.
 
 ## Execution logs
 
-Each request stores a compact summary containing its request ID, duration, status, model, retrieved chunk IDs, search statistics, workflow steps, and evaluation results.
+Each request stores a compact summary containing its request ID, duration, status, model, retrieved chunk IDs, search statistics, LangGraph attempts and corrections, workflow steps, and evaluation results.
 
 - Hosted requests: Cloudflare D1 table `market_brief_executions`
 - Local previews: `.local-data/market-brief-executions.jsonl` (excluded from Git)
@@ -98,7 +99,8 @@ Logs do not store the API key, complete prompts, or full FOMC documents.
 ## Technology stack
 
 - **LLM:** OpenAI Responses API, Structured Outputs, GPT-5 nano
-- **RAG:** OpenAI Embeddings, recursive chunking, RRF
+- **RAG:** LangChain Documents, RecursiveCharacterTextSplitter, OpenAI Embeddings, RRF
+- **Workflow:** LangGraph StateGraph, conditional edges, corrective RAG
 - **Search:** exact cosine similarity, SQLite FTS5, BM25
 - **Data:** Cloudflare D1, SQLite, Drizzle ORM
 - **Application:** TypeScript, React, Next.js, Cloudflare Workers

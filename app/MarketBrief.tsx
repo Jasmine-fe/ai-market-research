@@ -49,6 +49,13 @@ type ResearchResponse = {
     passed: boolean;
     checks: Array<{ name: string; passed: boolean; detail: string }>;
   };
+  workflow: {
+    framework: "LangGraph";
+    corrections: number;
+    retrievalAttempts: number;
+    generationAttempts: number;
+    correctionReason?: string;
+  };
 };
 
 function sourceNumbers(citationIds: string[], result: ResearchResponse) {
@@ -262,6 +269,7 @@ export default function MarketBrief() {
                 <div><dt>Query rewrite</dt><dd>{result.query.explanation}</dd></div>
                 <div><dt>Temporal filter</dt><dd>published_at ≤ {result.query.asOf}</dd></div>
                 <div><dt>Candidate pool</dt><dd>Semantic {result.retrieval.semanticCandidates} · Keyword {result.retrieval.keywordCandidates}</dd></div>
+                <div><dt>Agent workflow</dt><dd>{result.workflow.framework} · {result.workflow.corrections === 0 ? "Initial pass" : `${result.workflow.corrections} corrective retry`}</dd></div>
               </dl>
             </details>
             <section>

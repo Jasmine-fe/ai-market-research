@@ -26,6 +26,11 @@ export type QueryRewrite = {
   explanation: string;
 };
 
+export type QueryCorrection = {
+  previousQuery: Pick<QueryRewrite, "semanticQuery" | "keywords">;
+  reason: string;
+};
+
 export type HybridSearchEvidence = {
   id: string;
   documentId: string;
@@ -61,7 +66,10 @@ function keywordMatchQuery(keywords: string[]) {
   return [...new Set(terms)].map((term) => `"${term}"`).join(" OR ");
 }
 
-export async function rewriteResearchQuery(question: string): Promise<QueryRewrite> {
+export async function rewriteResearchQuery(
+  question: string,
+  correction?: QueryCorrection,
+): Promise<QueryRewrite> {
   const response = await generateStructuredResponse(
     [
       "You rewrite research questions for searching English FOMC minutes.",
@@ -70,8 +78,11 @@ export async function rewriteResearchQuery(question: string): Promise<QueryRewri
       "semanticQuery and keywords must be English. Keywords should be precise phrases likely to occur in official minutes.",
       "explanation must use concise Taiwan Traditional Chinese.",
       "isRelevant is true only for questions about markets, the economy, monetary policy, inflation, employment, or financial conditions.",
+      correction
+        ? "This is one corrective retry. Use the failure reason to produce a meaningfully different, more precise search query without changing the user's intent."
+        : "Produce the initial search query.",
     ].join("\n"),
-    JSON.stringify({ question }),
+    JSON.stringify({ question, correction }),
     QUERY_REWRITE_SCHEMA,
     "fomc_query_rewrite",
   );
