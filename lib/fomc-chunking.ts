@@ -1,6 +1,7 @@
-import { decode, encode } from "gpt-tokenizer";
+import { encode } from "gpt-tokenizer";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
 
-export const CHUNKING_VERSION = "section-recursive-v1";
+export const CHUNKING_VERSION = "section-langchain-recursive-v2";
 export const CHUNK_TARGET_TOKENS = 600;
 export const CHUNK_MAX_TOKENS = 700;
 export const CHUNK_OVERLAP_TOKENS = 90;
@@ -97,69 +98,28 @@ function tokenCount(value: string) {
   return encode(value).length;
 }
 
-function splitByTokens(value: string, maximum: number) {
-  const tokens = encode(value);
-  if (tokens.length <= maximum) return [value];
-  const parts: string[] = [];
-  for (let index = 0; index < tokens.length; index += maximum) {
-    parts.push(decode(tokens.slice(index, index + maximum)).trim());
-  }
-  return parts.filter(Boolean);
-}
+const sectionSplitter = new RecursiveCharacterTextSplitter({
+  chunkSize: CHUNK_TARGET_TOKENS,
+  chunkOverlap: CHUNK_OVERLAP_TOKENS,
+  keepSeparator: true,
+  lengthFunction: tokenCount,
+  separators: ["\n\n", "\n", ". ", "; ", ": ", " ", ""],
+});
 
-function recursiveSegments(text: string, maximum: number): string[] {
-  if (tokenCount(text) <= maximum) return [text.trim()];
-
-  const separators = [
-    /\n\n+/,
-    /(?<=[.!?])\s+(?=[A-Z0-9“"'])/,
-    /(?<=[;:])\s+/,
-    /\s+/,
-  ];
-  for (const separator of separators) {
-    const parts = text.split(separator).map((part) => part.trim()).filter(Boolean);
-    if (parts.length <= 1) continue;
-    return parts.flatMap((part) => recursiveSegments(part, maximum));
-  }
-  return splitByTokens(text, maximum);
-}
-
-function overlapTail(value: string) {
-  const tokens = encode(value);
-  return decode(tokens.slice(-CHUNK_OVERLAP_TOKENS)).trim();
-}
-
-function chunkSection(section: FomcSection) {
-  const segments = section.paragraphs.flatMap((paragraph) =>
-    recursiveSegments(paragraph, CHUNK_TARGET_TOKENS),
+export async function chunkFomcSections(
+  sections: FomcSection[],
+): Promise<FomcChunkDraft[]> {
+  const chunkedSections = await Promise.all(
+    sections.map(async (section, sectionIndex) => {
+      const chunks = await sectionSplitter.splitText(section.paragraphs.join("\n\n"));
+      return chunks.map((content, chunkIndex) => ({
+        sectionTitle: section.title,
+        sectionIndex,
+        chunkIndex,
+        content,
+        tokenCount: tokenCount(content),
+      }));
+    }),
   );
-  const chunks: string[] = [];
-  let current = "";
-
-  for (const segment of segments) {
-    const candidate = current ? `${current}\n\n${segment}` : segment;
-    if (tokenCount(candidate) <= CHUNK_MAX_TOKENS) {
-      current = candidate;
-      continue;
-    }
-
-    if (current) chunks.push(current);
-    const overlap = current ? overlapTail(current) : "";
-    const withOverlap = overlap ? `${overlap}\n\n${segment}` : segment;
-    current = tokenCount(withOverlap) <= CHUNK_MAX_TOKENS ? withOverlap : segment;
-  }
-  if (current) chunks.push(current);
-  return chunks;
-}
-
-export function chunkFomcSections(sections: FomcSection[]): FomcChunkDraft[] {
-  return sections.flatMap((section, sectionIndex) =>
-    chunkSection(section).map((content, chunkIndex) => ({
-      sectionTitle: section.title,
-      sectionIndex,
-      chunkIndex,
-      content,
-      tokenCount: tokenCount(content),
-    })),
-  );
+  return chunkedSections.flat().filter((chunk) => chunk.tokenCount <= CHUNK_MAX_TOKENS);
 }

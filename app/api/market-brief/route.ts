@@ -63,7 +63,12 @@ export async function POST(request: Request) {
         name,
         passed,
       })),
-      steps: result.trace.map((item) => ({ step: item.step, status: "completed" })),
+      workflow: result.workflow,
+      steps: result.trace.map((item) => ({
+        step: item.step,
+        status: "completed",
+        attempt: item.attempt,
+      })),
     });
     return Response.json({ requestId, ...result });
   } catch (error) {
@@ -76,6 +81,23 @@ export async function POST(request: Request) {
               : [],
           )
         : undefined;
+      const rewrite = details.rewrite as
+        | { semanticQuery?: string; keywords?: string[] }
+        | undefined;
+      const retrieval = details.retrieval as
+        | { semanticCandidates?: number; keywordCandidates?: number }
+        | undefined;
+      const trace = Array.isArray(details.trace)
+        ? (details.trace as Array<{ step?: unknown; attempt?: unknown }>).flatMap((item) =>
+            typeof item.step === "string"
+              ? [{
+                  step: item.step,
+                  status: "completed",
+                  attempt: typeof item.attempt === "number" ? item.attempt : undefined,
+                }]
+              : [],
+          )
+        : undefined;
       console.warn("Market research refused", error.code, {
         requestId,
         evaluationChecks,
@@ -85,10 +107,30 @@ export async function POST(request: Request) {
         requestedAt,
         ...completionFields(startedAt),
         status: "refused",
+        model: typeof details.model === "string" ? details.model : undefined,
+        ragStatus: error.code === "RAG_INDEX_EMPTY" || error.code === "INSUFFICIENT_EVIDENCE"
+          ? "insufficient"
+          : undefined,
         question,
         errorCode: error.code,
-        queryRewrite: details.rewrite as ExecutionLogSummary["queryRewrite"],
+        queryRewrite: rewrite
+          ? { semantic: rewrite.semanticQuery, keywords: rewrite.keywords }
+          : undefined,
+        retrievedChunks: Array.isArray(details.evidence)
+          ? details.evidence.filter((item): item is string => typeof item === "string")
+          : undefined,
+        searchStats: retrieval
+          ? {
+              semanticCandidates: retrieval.semanticCandidates,
+              keywordCandidates: retrieval.keywordCandidates,
+            }
+          : undefined,
         evaluationChecks,
+        failedChecks: evaluationChecks
+          ?.filter((check) => !check.passed)
+          .map((check) => check.name),
+        steps: trace,
+        workflow: details.workflow as ExecutionLogSummary["workflow"],
       });
       const status = error.code === "RAG_INDEX_EMPTY" ? 503 : 422;
       return Response.json(

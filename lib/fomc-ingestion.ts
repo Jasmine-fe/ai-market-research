@@ -40,7 +40,7 @@ async function fetchDocument(document: FomcCatalogDocument) {
   }
   const html = await response.text();
   const sections = extractFomcSections(html);
-  const chunks = chunkFomcSections(sections);
+  const chunks = await chunkFomcSections(sections);
   if (!chunks.length) throw new Error(`No chunks extracted from ${document.id}`);
   return {
     html,

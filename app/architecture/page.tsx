@@ -27,7 +27,7 @@ const coreSkills = [
   {
     index: "04",
     name: "Agent Workflow",
-    detail: "A traceable sequence from question to evidence-backed answer",
+    detail: "LangGraph conditional routing with one bounded corrective retry",
   },
   {
     index: "05",
@@ -41,9 +41,10 @@ const systemNodes = [
   ["02", "Ingestion Pipeline", "Discover · parse · chunk"],
   ["03", "OpenAI Embeddings", "256-dimensional vectors"],
   ["04", "Cloudflare D1", "Chunks · metadata · vectors · FTS5"],
-  ["05", "Hybrid Retriever", "Cosine · BM25 · RRF"],
-  ["06", "OpenAI Responses API", "Answer · citations · evaluation"],
-  ["07", "Research Interface", "Evidence-first market research"],
+  ["05", "LangChain RAG", "Documents · splitter · hybrid retriever"],
+  ["06", "LangGraph Workflow", "State · nodes · conditional edges"],
+  ["07", "OpenAI Responses API", "Answer · citations · evaluation"],
+  ["08", "Research Interface", "Evidence-first market research"],
 ];
 
 const evaluationChecks = [
@@ -139,7 +140,7 @@ export default function ArchitecturePage() {
         <div className="system-flow" aria-label="End-to-end system flow">
           {systemNodes.map(([index, title, detail], nodeIndex) => (
             <div className="system-flow__item" key={index}>
-              <article className={nodeIndex === 3 ? "system-flow__node system-flow__node--core" : "system-flow__node"}>
+              <article className={nodeIndex === 4 || nodeIndex === 5 ? "system-flow__node system-flow__node--core" : "system-flow__node"}>
                 <span>{index}</span>
                 <strong>{title}</strong>
                 <small>{detail}</small>
@@ -168,7 +169,7 @@ export default function ArchitecturePage() {
           <article>
             <span className="service-map__label">SOURCE &amp; QUALITY</span>
             <h3>GitHub Actions</h3>
-            <p>Public source control with automated lint, production build, and 16 regression tests on every change.</p>
+            <p>Public source control with automated lint, production build, and 21 regression tests on every change.</p>
           </article>
         </div>
       </section>
@@ -259,9 +260,9 @@ export default function ArchitecturePage() {
             <h2>A bounded agent, not an open-ended chatbot.</h2>
           </div>
           <p>
-            Every request follows a deterministic workflow. LLMs are used only where
-            language understanding is necessary; data access, ranking, and safety
-            decisions remain explicit application steps.
+            LangGraph models every request as explicit state, nodes, and conditional
+            edges. LLMs handle language tasks while retrieval, routing, retry limits,
+            and safety decisions remain deterministic application logic.
           </p>
         </div>
         <ol className="workflow-timeline">
@@ -270,6 +271,7 @@ export default function ArchitecturePage() {
           <li><span>03</span><div><strong>Construct context</strong><p>Pass only selected excerpts, stable chunk IDs, dates, sections, and URLs.</p></div></li>
           <li><span>04</span><div><strong>Generate answer</strong><p>Produce strict JSON with concise answer points and required citation IDs.</p></div></li>
           <li><span>05</span><div><strong>Evaluate output</strong><p>Verify support and deterministic safety rules before returning any conclusion.</p></div></li>
+          <li><span>06</span><div><strong>Correct once or stop</strong><p>LangGraph rewrites the query and repeats retrieval when a retriable check fails; safety failures stop immediately.</p></div></li>
         </ol>
       </section>
 
@@ -279,8 +281,9 @@ export default function ArchitecturePage() {
           <h2>Reliability is enforced after generation.</h2>
           <p>
             The output is not trusted because it came from an LLM. Every conclusion
-            must pass retrieval, citation, temporal, and safety checks. A failed check
-            returns a refusal instead of a partially grounded answer.
+            must pass retrieval, citation, temporal, and safety checks. Citation or
+            retrieval failures receive one corrective attempt; safety failures and a
+            second failed evaluation return a refusal.
           </p>
         </div>
         <div className="quality-grid">
@@ -295,7 +298,7 @@ export default function ArchitecturePage() {
         <div className="refusal-flow">
           <div><span>ALL CHECKS PASS</span><strong>Return cited research answer</strong></div>
           <b>OR</b>
-          <div className="refusal-flow__blocked"><span>ANY CHECK FAILS</span><strong>Fail closed · show no conclusion</strong></div>
+          <div className="refusal-flow__blocked"><span>CHECK FAILS</span><strong>Correct once when retriable · otherwise fail closed</strong></div>
         </div>
       </section>
 
@@ -320,7 +323,8 @@ export default function ArchitecturePage() {
   "search": { "semantic": 30, "keyword": 30 },
   "retrievedChunks": ["chunk_…", "chunk_…"],
   "evaluation": { "passed": true, "checks": 5 },
-  "steps": ["rewrite", "retrieve", "answer", "evaluate"],
+  "workflow": { "framework": "LangGraph", "corrections": 1 },
+  "steps": ["rewrite", "retrieve", "answer", "evaluate", "rewrite", "retrieve"],
   "durationMs": 17688
 }`}</pre>
           <p>Excluded by design: API keys · full prompts · complete FOMC documents</p>
@@ -334,7 +338,8 @@ export default function ArchitecturePage() {
         </div>
         <div className="stack-grid">
           <article><span>LLM</span><p>OpenAI Responses API · Structured Outputs · GPT-5 nano</p></article>
-          <article><span>RAG</span><p>OpenAI Embeddings · Recursive Chunking · RRF</p></article>
+          <article><span>RAG</span><p>LangChain Documents · RecursiveCharacterTextSplitter · RRF</p></article>
+          <article><span>WORKFLOW</span><p>LangGraph StateGraph · Conditional Edges · Corrective RAG</p></article>
           <article><span>SEARCH</span><p>Exact Cosine Similarity · SQLite FTS5 · BM25</p></article>
           <article><span>DATA</span><p>Cloudflare D1 · SQLite · Drizzle ORM</p></article>
           <article><span>APPLICATION</span><p>TypeScript · React · Next.js · Cloudflare Workers</p></article>

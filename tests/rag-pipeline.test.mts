@@ -8,11 +8,15 @@ import {
 import { fuseHybridRanks } from "../lib/hybrid-ranking.ts";
 import { hasRetrievalCandidates } from "../lib/retrieval-availability.ts";
 import {
+  decideEvaluationRoute,
+  type ResearchCheck,
+} from "../lib/research-workflow-policy.ts";
+import {
   failedCheckLabel,
   refusalReasonLabel,
 } from "../lib/research-refusal-display.ts";
 
-test("section-aware chunking never crosses section boundaries", () => {
+test("section-aware chunking never crosses section boundaries", async () => {
   const paragraph = "Financial conditions remained restrictive. ".repeat(180);
   const html = `
     <h3>Minutes of the Federal Open Market Committee</h3>
@@ -22,7 +26,7 @@ test("section-aware chunking never crosses section boundaries", () => {
     <p>${"Inflation was expected to decline gradually. ".repeat(120)}</p>
   `;
   const sections = extractFomcSections(html);
-  const chunks = chunkFomcSections(sections);
+  const chunks = await chunkFomcSections(sections);
 
   assert.deepEqual(sections.map((item) => item.title), [
     "Developments in Financial Markets",
@@ -38,8 +42,8 @@ test("section-aware chunking never crosses section boundaries", () => {
   );
 });
 
-test("recursive chunking preserves a short section as one chunk", () => {
-  const chunks = chunkFomcSections([
+test("recursive chunking preserves a short section as one chunk", async () => {
+  const chunks = await chunkFomcSections([
     { title: "Committee Policy Actions", paragraphs: ["The Committee maintained its target range."] },
   ]);
   assert.equal(chunks.length, 1);
@@ -97,5 +101,36 @@ test("refusal details use clear Traditional Chinese labels", () => {
   assert.equal(
     failedCheckLabel("Citation support"),
     "引用原文無法直接支持結論",
+  );
+});
+
+function workflowChecks(failures: string[] = []): ResearchCheck[] {
+  return [
+    "Retrieval availability",
+    "Citation validity",
+    "Citation support",
+    "Temporal safety",
+    "No trading instruction",
+  ].map((name) => ({ name, passed: !failures.includes(name), detail: name }));
+}
+
+test("LangGraph accepts an answer when every evaluation passes", () => {
+  assert.equal(decideEvaluationRoute(workflowChecks(), 0), "accept");
+});
+
+test("LangGraph corrects a citation failure only once", () => {
+  const checks = workflowChecks(["Citation support"]);
+  assert.equal(decideEvaluationRoute(checks, 0), "correct");
+  assert.equal(decideEvaluationRoute(checks, 1), "refuse");
+});
+
+test("LangGraph refuses safety failures without another generation", () => {
+  assert.equal(
+    decideEvaluationRoute(workflowChecks(["No trading instruction"]), 0),
+    "refuse",
+  );
+  assert.equal(
+    decideEvaluationRoute(workflowChecks(["Temporal safety"]), 0),
+    "refuse",
   );
 });
